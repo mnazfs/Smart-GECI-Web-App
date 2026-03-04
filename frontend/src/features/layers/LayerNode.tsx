@@ -47,16 +47,16 @@ const LayerNode = memo(function LayerNode({ node, depth }: LayerNodeProps) {
   return (
     <div>
       <div
-        className={`flex items-center gap-2 px-2 py-1.5 rounded-md cursor-pointer group transition-colors ${
-          isActive ? 'bg-emerald-50' : 'hover:bg-slate-50'
+        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer group transition-all duration-150 ${
+          isActive ? 'bg-gradient-to-r from-emerald-50 to-emerald-50/50 shadow-sm' : 'hover:bg-slate-50'
         }`}
-        style={{ paddingLeft: `${8 + indentPx}px` }}
+        style={{ paddingLeft: `${10 + indentPx}px` }}
       >
         {/* expand/collapse toggle */}
         <button
           onClick={handleExpand}
-          className={`w-4 h-4 flex items-center justify-center text-slate-400 shrink-0 transition-transform ${
-            hasChildren ? 'hover:text-slate-600' : 'cursor-default'
+          className={`w-4 h-4 flex items-center justify-center text-slate-400 shrink-0 transition-all duration-200 ${
+            hasChildren ? 'hover:text-slate-600 hover:scale-110' : 'cursor-default'
           } ${isExpanded ? 'rotate-90' : ''}`}
           tabIndex={-1}
           aria-label={isExpanded ? 'Collapse' : 'Expand'}
@@ -67,7 +67,7 @@ const LayerNode = memo(function LayerNode({ node, depth }: LayerNodeProps) {
         {/* checkbox */}
         <input
           type="checkbox"
-          className="w-3.5 h-3.5 rounded accent-emerald-500 cursor-pointer shrink-0"
+          className="w-4 h-4 rounded accent-emerald-500 cursor-pointer shrink-0 transition-transform hover:scale-110"
           checked={isActive}
           ref={el => {
             if (el) el.indeterminate = isIndeterminate;
@@ -78,8 +78,8 @@ const LayerNode = memo(function LayerNode({ node, depth }: LayerNodeProps) {
 
         {/* label */}
         <span
-          className={`text-sm truncate flex-1 ${
-            isActive ? 'text-slate-800 font-medium' : 'text-slate-600'
+          className={`text-sm truncate flex-1 transition-colors ${
+            isActive ? 'text-slate-900 font-semibold' : 'text-slate-600 group-hover:text-slate-800'
           }`}
           title={node.name}
         >
@@ -89,7 +89,7 @@ const LayerNode = memo(function LayerNode({ node, depth }: LayerNodeProps) {
         {/* restricted badge */}
         {isRestricted && (
           <span
-            className="text-xs px-1 py-0.5 rounded bg-amber-100 text-amber-600 font-medium shrink-0"
+            className="text-xs px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-medium shrink-0 shadow-sm"
             title="Restricted layer"
           >
             🔒
@@ -99,7 +99,7 @@ const LayerNode = memo(function LayerNode({ node, depth }: LayerNodeProps) {
 
       {/* children */}
       {hasChildren && isExpanded && (
-        <div>
+        <div className="mt-0.5">
           {node.children!.map(child => (
             <LayerNode key={child.id} node={child} depth={depth + 1} />
           ))}

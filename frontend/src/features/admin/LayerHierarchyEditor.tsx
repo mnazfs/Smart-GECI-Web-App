@@ -55,16 +55,16 @@ function SortableRow({ row, allLayers, onParentChange, onRestrictedChange }: Sor
     <tr
       ref={setNodeRef}
       style={style}
-      className={`border-b border-slate-100 last:border-0 bg-white hover:bg-purple-50/30 transition-colors ${
-        isDragging ? 'shadow-lg ring-2 ring-purple-300' : ''
+      className={`border-b border-slate-100 last:border-0 bg-white hover:bg-blue-50/30 transition-all duration-150 ${
+        isDragging ? 'shadow-2xl ring-2 ring-blue-400 bg-blue-50' : ''
       }`}
     >
       {/* drag handle */}
-      <td className="px-3 py-2.5 w-8">
+      <td className="px-4 py-3.5 w-10">
         <button
           {...attributes}
           {...listeners}
-          className="text-slate-300 hover:text-slate-500 cursor-grab active:cursor-grabbing text-base"
+          className="text-slate-400 hover:text-slate-700 cursor-grab active:cursor-grabbing text-lg transition-colors"
           aria-label={`Drag ${row.name}`}
         >
           ⠿
@@ -72,22 +72,22 @@ function SortableRow({ row, allLayers, onParentChange, onRestrictedChange }: Sor
       </td>
 
       {/* name */}
-      <td className="px-3 py-2.5">
+      <td className="px-4 py-3.5">
         <span
-          className="text-sm font-medium text-slate-700"
-          style={{ paddingLeft: `${(row.depth ?? 0) * 14}px` }}
+          className="text-sm font-semibold text-slate-800"
+          style={{ paddingLeft: `${(row.depth ?? 0) * 18}px` }}
         >
-          {(row.depth ?? 0) > 0 && <span className="text-slate-300 mr-1">└</span>}
+          {(row.depth ?? 0) > 0 && <span className="text-slate-300 mr-2">└</span>}
           {row.name}
         </span>
       </td>
 
       {/* parent selector */}
-      <td className="px-3 py-2.5">
+      <td className="px-4 py-3.5">
         <select
           value={row.parentId ?? ''}
           onChange={e => onParentChange(row.id, e.target.value || null)}
-          className="text-xs border border-slate-200 rounded px-2 py-1 text-slate-600 bg-white hover:border-purple-300 focus:outline-none focus:border-purple-500 transition-colors max-w-36"
+          className="text-xs border border-slate-200 rounded-lg px-3 py-2 text-slate-700 bg-white hover:border-blue-300 focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-transparent transition-all duration-200 max-w-40 font-medium"
         >
           <option value="">— root —</option>
           {possibleParents.map(p => (
@@ -99,17 +99,17 @@ function SortableRow({ row, allLayers, onParentChange, onRestrictedChange }: Sor
       </td>
 
       {/* restricted toggle */}
-      <td className="px-3 py-2.5 text-center">
+      <td className="px-4 py-3.5 text-center">
         <button
           onClick={() => onRestrictedChange(row.id, !row.restricted)}
-          className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-            row.restricted ? 'bg-amber-400' : 'bg-slate-200'
+          className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-200 shadow-sm ${
+            row.restricted ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-slate-300'
           }`}
           aria-label={`Toggle restricted for ${row.name}`}
         >
           <span
-            className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-              row.restricted ? 'translate-x-4' : 'translate-x-1'
+            className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ${
+              row.restricted ? 'translate-x-6' : 'translate-x-1'
             }`}
           />
         </button>
@@ -170,11 +170,11 @@ export default function LayerHierarchyEditor() {
     JSON.stringify(flatLayers) !== JSON.stringify(flattenTree(layerTree));
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="fade-in">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-slate-700">Hierarchy Editor</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-xl font-bold text-slate-900">Hierarchy Editor</h2>
+          <p className="text-sm text-slate-600 mt-1">
             Drag rows to reorder · Change parent relationships · Toggle restricted access
           </p>
         </div>
@@ -182,13 +182,13 @@ export default function LayerHierarchyEditor() {
           <div className="flex gap-2">
             <button
               onClick={handleReset}
-              className="text-sm px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
+              className="text-sm px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition-all duration-200 font-medium"
             >
               Reset
             </button>
             <button
               onClick={handleApply}
-              className="text-sm px-3 py-1.5 rounded bg-purple-600 text-white hover:bg-purple-500 transition-colors font-medium"
+              className="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 transition-all duration-200 font-medium shadow-sm hover:shadow-md"
             >
               Apply Hierarchy
             </button>
@@ -196,14 +196,14 @@ export default function LayerHierarchyEditor() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-2xl border border-slate-200/50 overflow-hidden shadow-lg">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="px-3 py-2.5 w-8" />
-              <th className="text-left px-3 py-2.5 text-slate-600 font-semibold">Layer Name</th>
-              <th className="text-left px-3 py-2.5 text-slate-600 font-semibold">Parent Layer</th>
-              <th className="text-center px-3 py-2.5 text-slate-600 font-semibold">Restricted</th>
+            <tr className="bg-gradient-to-b from-slate-50 to-slate-100 border-b border-slate-200">
+              <th className="px-4 py-3.5 w-10" />
+              <th className="text-left px-4 py-3.5 text-slate-700 font-bold text-xs uppercase tracking-wider">Layer Name</th>
+              <th className="text-left px-4 py-3.5 text-slate-700 font-bold text-xs uppercase tracking-wider">Parent Layer</th>
+              <th className="text-center px-4 py-3.5 text-slate-700 font-bold text-xs uppercase tracking-wider">Restricted</th>
             </tr>
           </thead>
           <DndContext
@@ -228,8 +228,9 @@ export default function LayerHierarchyEditor() {
         </table>
       </div>
 
-      <p className="text-xs text-slate-400 mt-3">
-        ⚠️ Changes are applied locally. Backend persistence will be added in a future release.
+      <p className="text-xs text-slate-500 mt-4 flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+        Changes are applied locally. Backend persistence will be added in a future release.
       </p>
     </div>
   );

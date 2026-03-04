@@ -83,11 +83,11 @@ export default function LayerRegistryPage() {
   ) !== JSON.stringify(originalFlat.map(n => ({ id: n.id, restricted: n.restricted })));
 
   return (
-    <div>
-      <div className="flex items-center justify-between mb-4">
+    <div className="fade-in">
+      <div className="flex items-center justify-between mb-6">
         <div>
-          <h2 className="text-lg font-semibold text-slate-700">Layer Registry</h2>
-          <p className="text-sm text-slate-500">
+          <h2 className="text-xl font-bold text-slate-900">Layer Registry</h2>
+          <p className="text-sm text-slate-600 mt-1">
             {flatRows.length} layers registered · Toggle restricted access per layer
           </p>
         </div>
@@ -95,14 +95,14 @@ export default function LayerRegistryPage() {
           <div className="flex gap-2">
             <button
               onClick={handleReset}
-              className="text-sm px-3 py-1.5 rounded border border-slate-300 text-slate-600 hover:bg-slate-50 transition-colors"
+              className="text-sm px-4 py-2 rounded-lg border border-slate-300 text-slate-700 hover:bg-slate-50 transition-all duration-200 font-medium"
             >
               Reset
             </button>
             <button
               onClick={handleApply}
               disabled={isSaving}
-              className="text-sm px-3 py-1.5 rounded bg-purple-600 text-white hover:bg-purple-500 disabled:bg-slate-300 disabled:text-slate-500 transition-colors font-medium"
+              className="text-sm px-4 py-2 rounded-lg bg-gradient-to-r from-blue-500 to-blue-600 text-white hover:from-blue-600 hover:to-blue-700 disabled:from-slate-300 disabled:to-slate-300 disabled:text-slate-500 transition-all duration-200 font-medium shadow-sm hover:shadow-md disabled:shadow-none"
             >
               {isSaving ? 'Saving…' : 'Apply Changes'}
             </button>
@@ -110,53 +110,53 @@ export default function LayerRegistryPage() {
         )}
       </div>
 
-      <div className="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm">
+      <div className="bg-white rounded-2xl border border-slate-200/50 overflow-hidden shadow-lg">
         <table className="w-full text-sm">
           <thead>
-            <tr className="bg-slate-50 border-b border-slate-200">
-              <th className="text-left px-4 py-2.5 text-slate-600 font-semibold">Layer Name</th>
-              <th className="text-left px-4 py-2.5 text-slate-600 font-semibold">GeoServer Name</th>
-              <th className="text-left px-4 py-2.5 text-slate-600 font-semibold">Parent ID</th>
-              <th className="text-center px-4 py-2.5 text-slate-600 font-semibold">Restricted</th>
+            <tr className="bg-gradient-to-b from-slate-50 to-slate-100 border-b border-slate-200">
+              <th className="text-left px-5 py-3.5 text-slate-700 font-bold text-xs uppercase tracking-wider">Layer Name</th>
+              <th className="text-left px-5 py-3.5 text-slate-700 font-bold text-xs uppercase tracking-wider">GeoServer Name</th>
+              <th className="text-left px-5 py-3.5 text-slate-700 font-bold text-xs uppercase tracking-wider">Parent ID</th>
+              <th className="text-center px-5 py-3.5 text-slate-700 font-bold text-xs uppercase tracking-wider">Restricted</th>
             </tr>
           </thead>
           <tbody>
             {flatRows.map((row, idx) => (
               <tr
                 key={row.id}
-                className={`border-b border-slate-100 last:border-0 transition-colors ${
+                className={`border-b border-slate-100 last:border-0 transition-all duration-150 ${
                   idx % 2 === 0 ? 'bg-white' : 'bg-slate-50/50'
-                } hover:bg-purple-50/30`}
+                } hover:bg-blue-50/30`}
               >
-                <td className="px-4 py-2.5">
+                <td className="px-5 py-3.5">
                   <span
-                    className="font-medium text-slate-700"
-                    style={{ paddingLeft: `${row.depth * 16}px` }}
+                    className="font-semibold text-slate-800"
+                    style={{ paddingLeft: `${row.depth * 20}px` }}
                   >
                     {row.depth > 0 && (
-                      <span className="text-slate-300 mr-1">{'└'}</span>
+                      <span className="text-slate-300 mr-2">{'└'}</span>
                     )}
                     {row.name}
                   </span>
                 </td>
-                <td className="px-4 py-2.5 font-mono text-xs text-slate-500">
+                <td className="px-5 py-3.5 font-mono text-xs text-slate-600">
                   {row.geoserverName}
                 </td>
-                <td className="px-4 py-2.5 text-slate-500 text-xs">
-                  {row.parentId ?? <span className="text-slate-300 italic">root</span>}
+                <td className="px-5 py-3.5 text-slate-500 text-xs font-medium">
+                  {row.parentId ?? <span className="text-slate-400 italic">root</span>}
                 </td>
-                <td className="px-4 py-2.5 text-center">
+                <td className="px-5 py-3.5 text-center">
                   <button
                     onClick={() => toggleRestricted(row.id)}
-                    className={`relative inline-flex h-5 w-9 items-center rounded-full transition-colors ${
-                      row.restricted ? 'bg-amber-400' : 'bg-slate-200'
+                    className={`relative inline-flex h-6 w-11 items-center rounded-full transition-all duration-200 shadow-sm ${
+                      row.restricted ? 'bg-gradient-to-r from-amber-400 to-amber-500' : 'bg-slate-300'
                     }`}
                     aria-label={`Toggle restricted for ${row.name}`}
                     title={row.restricted ? 'Restricted — click to allow public' : 'Public — click to restrict'}
                   >
                     <span
-                      className={`inline-block h-3.5 w-3.5 transform rounded-full bg-white shadow transition-transform ${
-                        row.restricted ? 'translate-x-4' : 'translate-x-1'
+                      className={`inline-block h-4 w-4 transform rounded-full bg-white shadow-md transition-transform duration-200 ${
+                        row.restricted ? 'translate-x-6' : 'translate-x-1'
                       }`}
                     />
                   </button>
@@ -167,7 +167,8 @@ export default function LayerRegistryPage() {
         </table>
       </div>
 
-      <p className="text-xs text-slate-400 mt-3">
+      <p className="text-xs text-slate-500 mt-4 flex items-center gap-1.5">
+        <span className="w-1.5 h-1.5 rounded-full bg-slate-400" />
         Changes are saved to the backend via PUT /api/layers/:id/restricted.
       </p>
     </div>
