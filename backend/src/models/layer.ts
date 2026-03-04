@@ -58,3 +58,14 @@ export function rowToLayer(row: LayerRow): Layer {
     updatedAt:     row.updated_at,
   };
 }
+
+// ─── Tree node (used by hierarchy endpoint) ───────────────────────────────────
+
+export interface LayerTreeNode {
+  id:            string;
+  name:          string;
+  geoserverName: string;
+  parentId:      string | null;
+  restricted:    boolean;
+  children:      LayerTreeNode[];
+}

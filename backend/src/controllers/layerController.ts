@@ -1,5 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { syncWorkspaceLayers } from '../services/geoserverService';
+import { getLayerHierarchy }   from '../services/layerService';
 import { LayerRepository }     from '../repositories/layerRepository';
 import { AppError }            from '../middleware/errorHandler';
 import { successResponse }     from '../utils';
@@ -67,6 +68,35 @@ export async function getLayers(
   try {
     const layers = await LayerRepository.getAllLayers();
     res.status(200).json(successResponse(layers));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── getHierarchy ─────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/layers/hierarchy
+ *
+ * Returns a nested tree of all visible layers, built in memory from
+ * the flat layer_registry rows.  No recursive SQL is used.
+ *
+ * Response shape:
+ * [
+ *   {
+ *     id, name, geoserverName, restricted,
+ *     children: [ { id, name, geoserverName, restricted, children: [] }, … ]
+ *   }
+ * ]
+ */
+export async function getHierarchy(
+  _req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const tree = await getLayerHierarchy();
+    res.status(200).json(successResponse(tree));
   } catch (err) {
     next(err);
   }

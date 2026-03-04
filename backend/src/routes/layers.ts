@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { syncLayers, getLayers, updateRestricted } from '../controllers/layerController';
+import { syncLayers, getLayers, getHierarchy, updateRestricted } from '../controllers/layerController';
 
 const router = Router();
 
@@ -8,6 +8,12 @@ const router = Router();
  * Returns all registered layers (flat list).
  */
 router.get('/', getLayers);
+
+/**
+ * GET /api/layers/hierarchy
+ * Returns all visible layers as a nested tree (built in memory, no recursive SQL).
+ */
+router.get('/hierarchy', getHierarchy);
 
 /**
  * POST /api/layers/sync

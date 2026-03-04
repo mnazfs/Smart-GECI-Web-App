@@ -7,4 +7,6 @@
 
 export { syncWorkspaceLayers } from './geoserverService';
 export type { SyncResult }     from './geoserverService';
+
+export { getLayerHierarchy }   from './layerService';
 // export { FacilityService } from './facilityService';

@@ -8,6 +8,7 @@
 export type {
   Layer,
   LayerRow,
+  LayerTreeNode,
   InsertLayerInput,
   UpdateLayerParentInput,
   UpdateLayerRestrictedInput,
