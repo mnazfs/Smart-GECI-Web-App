@@ -1,5 +1,7 @@
-import { LayerRepository } from '../repositories/layerRepository';
+import { LayerRepository }         from '../repositories/layerRepository';
 import type { Layer, LayerTreeNode } from '../models/layer';
+import { canViewRestricted }         from '../types/role';
+import type { UserRole }             from '../types/role';
 
 // ─── buildTree ────────────────────────────────────────────────────────────────
 
@@ -12,16 +14,21 @@ import type { Layer, LayerTreeNode } from '../models/layer';
  *
  * Rules:
  * - Only `visible = true` layers are included in the result.
- * - A node whose `parentId` points to a non-existent (or invisible) parent
- *   is promoted to a root node rather than being silently dropped.
+ * - Restricted layers are excluded when `role` cannot view restricted content.
+ *   Their visible children are orphaned and promoted to root automatically.
+ * - A node whose `parentId` points to a non-existent (or invisible/filtered-out)
+ *   parent is promoted to a root node rather than being silently dropped.
  * - Children arrays are sorted alphabetically by name for deterministic output.
  */
-function buildTree(layers: Layer[]): LayerTreeNode[] {
-  // ── Pass 1: create node map (visible layers only) ────────────────────────
+function buildTree(layers: Layer[], role: UserRole): LayerTreeNode[] {
+  const showRestricted = canViewRestricted(role);
+
+  // ── Pass 1: create node map (visible + role-permitted layers only) ────────
   const nodeMap = new Map<string, LayerTreeNode>();
 
   for (const layer of layers) {
     if (!layer.visible) continue;
+    if (layer.restricted && !showRestricted) continue;
 
     nodeMap.set(layer.id, {
       id:            layer.id,
@@ -63,10 +70,15 @@ function buildTree(layers: Layer[]): LayerTreeNode[] {
 /**
  * Fetches all layers from the database and returns a nested tree.
  *
- * Only visible layers are included.
+ * Only visible layers are included.  Restricted layers are also filtered out
+ * unless `role` is `'authorized'` or `'admin'`.
  * Does NOT use recursive SQL — the tree is assembled in memory.
+ *
+ * @param role - The requesting user's role.  Defaults to `'guest'` (most
+ *               restrictive) so callers that have not yet wired up role
+ *               extraction still receive a safe response.
  */
-export async function getLayerHierarchy(): Promise<LayerTreeNode[]> {
+export async function getLayerHierarchy(role: UserRole = 'guest'): Promise<LayerTreeNode[]> {
   const flat = await LayerRepository.getAllLayers();
-  return buildTree(flat);
+  return buildTree(flat, role);
 }

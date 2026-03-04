@@ -90,12 +90,14 @@ export async function getLayers(
  * ]
  */
 export async function getHierarchy(
-  _req: Request,
+  req: Request,
   res: Response,
   next: NextFunction,
 ): Promise<void> {
   try {
-    const tree = await getLayerHierarchy();
+    // req.role is populated by the roleContext middleware (see app.ts).
+    // It is always a valid UserRole — unknown values are normalised to 'guest'.
+    const tree = await getLayerHierarchy(req.role);
     res.status(200).json(successResponse(tree));
   } catch (err) {
     next(err);
