@@ -1,5 +1,13 @@
 import { Router } from 'express';
-import { syncLayers, getLayers, getHierarchy, updateRestricted } from '../controllers/layerController';
+import {
+  syncLayers,
+  getLayers,
+  getHierarchy,
+  updateRestricted,
+  updateParentAdmin,
+  updateRestrictedAdmin,
+} from '../controllers/layerController';
+import { requireAdmin } from '../middleware/roleMiddleware';
 
 const router = Router();
 
@@ -28,5 +36,20 @@ router.post('/sync', syncLayers);
  * Body: { "restricted": true | false }
  */
 router.patch('/:id/restricted', updateRestricted);
+
+/**
+ * PUT /api/layers/:id/parent  [admin only]
+ * Reassigns the parent of a layer, or promotes to root when parentId is null.
+ * Detects self-parenting and circular hierarchy.
+ * Body: { "parentId": "<uuid>" | null }
+ */
+router.put('/:id/parent', requireAdmin, updateParentAdmin);
+
+/**
+ * PUT /api/layers/:id/restricted  [admin only]
+ * Sets the restricted flag on a layer.
+ * Body: { "restricted": true | false }
+ */
+router.put('/:id/restricted', requireAdmin, updateRestrictedAdmin);
 
 export default router;

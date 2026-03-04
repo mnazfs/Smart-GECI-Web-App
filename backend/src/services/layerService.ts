@@ -2,6 +2,7 @@ import { LayerRepository }         from '../repositories/layerRepository';
 import type { Layer, LayerTreeNode } from '../models/layer';
 import { canViewRestricted }         from '../types/role';
 import type { UserRole }             from '../types/role';
+import { AppError }                 from '../middleware/errorHandler';
 
 // ─── buildTree ────────────────────────────────────────────────────────────────
 
@@ -81,4 +82,89 @@ function buildTree(layers: Layer[], role: UserRole): LayerTreeNode[] {
 export async function getLayerHierarchy(role: UserRole = 'guest'): Promise<LayerTreeNode[]> {
   const flat = await LayerRepository.getAllLayers();
   return buildTree(flat, role);
+}
+
+// ─── setLayerParent ───────────────────────────────────────────────────────────
+
+/**
+ * Reassigns the parent of a layer.  Pass `newParentId: null` to promote a
+ * layer to root level.
+ *
+ * Validation (all throw 400 via AppError):
+ *   1. Target layer must exist.
+ *   2. Self-parenting is rejected (`id === newParentId`).
+ *   3. Setting a *descendant* of `id` as its new parent would create a cycle —
+ *      detected by walking the current parent chain of `newParentId` upward.
+ *
+ * Re-uses `getAllLayers()` so only one round-trip is needed regardless of
+ * tree depth.
+ */
+export async function setLayerParent(
+  id:          string,
+  newParentId: string | null,
+): Promise<Layer> {
+  const allLayers = await LayerRepository.getAllLayers();
+
+  // ── 1. Target must exist ──────────────────────────────────────────────────
+  const target = allLayers.find(l => l.id === id);
+  if (!target) {
+    throw new AppError(`Layer ${id} not found`, 404);
+  }
+
+  if (newParentId !== null) {
+    // ── 2. Self-parenting guard ─────────────────────────────────────────────
+    if (newParentId === id) {
+      throw new AppError('A layer cannot be its own parent', 400);
+    }
+
+    // ── 3. Cycle guard ──────────────────────────────────────────────────────
+    // Build an O(1) lookup: layerId → parentId using the CURRENT tree state.
+    // We then walk upward from newParentId; if we encounter `id` it means
+    // newParentId is already a descendant of id, creating a cycle.
+    const parentMap = new Map<string, string | null>(
+      allLayers.map(l => [l.id, l.parentId]),
+    );
+
+    // Also check the proposed parent exists in the registry
+    if (!parentMap.has(newParentId)) {
+      throw new AppError(`Parent layer ${newParentId} not found`, 404);
+    }
+
+    let cursor: string | null = newParentId;
+    while (cursor !== null) {
+      if (cursor === id) {
+        throw new AppError(
+          'Cannot set parent: this would create a circular hierarchy',
+          400,
+        );
+      }
+      cursor = parentMap.get(cursor) ?? null;
+    }
+  }
+
+  const updated = await LayerRepository.updateLayerParent({ id, parentId: newParentId });
+  // updateLayerParent returns null only if the row disappeared between our
+  // SELECT and the UPDATE — treat it as a 404.
+  if (!updated) {
+    throw new AppError(`Layer ${id} not found`, 404);
+  }
+
+  return updated;
+}
+
+// ─── setLayerRestricted ───────────────────────────────────────────────────────
+
+/**
+ * Sets the `restricted` access-control flag on a layer.
+ * Returns the updated layer or throws a 404 AppError if not found.
+ */
+export async function setLayerRestricted(
+  id:         string,
+  restricted: boolean,
+): Promise<Layer> {
+  const updated = await LayerRepository.updateRestricted({ id, restricted });
+  if (!updated) {
+    throw new AppError(`Layer ${id} not found`, 404);
+  }
+  return updated;
 }

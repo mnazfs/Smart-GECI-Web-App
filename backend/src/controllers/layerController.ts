@@ -1,6 +1,6 @@
 import type { Request, Response, NextFunction } from 'express';
 import { syncWorkspaceLayers } from '../services/geoserverService';
-import { getLayerHierarchy }   from '../services/layerService';
+import { getLayerHierarchy, setLayerParent, setLayerRestricted } from '../services/layerService';
 import { LayerRepository }     from '../repositories/layerRepository';
 import { AppError }            from '../middleware/errorHandler';
 import { successResponse }     from '../utils';
@@ -132,6 +132,80 @@ export async function updateRestricted(
       return next(new AppError(`Layer ${id} not found`, 404));
     }
 
+    res.status(200).json(successResponse(updated));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── updateParentAdmin ────────────────────────────────────────────────────────
+
+/**
+ * PUT /api/layers/:id/parent
+ *
+ * Admin-only.  Reassigns the parent of a layer.
+ *
+ * Body: { "parentId": "<uuid>" | null }
+ *
+ * Errors:
+ *   400 — missing / wrong-type body, self-parent, circular hierarchy
+ *   403 — non-admin caller (enforced by requireAdmin middleware, not here)
+ *   404 — layer or proposed parent not found
+ */
+export async function updateParentAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const body   = req.body as { parentId?: unknown };
+
+    // Accept explicit null (promote to root) but reject missing key
+    if (!('parentId' in body)) {
+      return next(new AppError('parentId is required (use null to promote to root)', 400));
+    }
+
+    const rawParentId = body.parentId;
+    if (rawParentId !== null && typeof rawParentId !== 'string') {
+      return next(new AppError('parentId must be a string UUID or null', 400));
+    }
+
+    const updated = await setLayerParent(id, rawParentId as string | null);
+    res.status(200).json(successResponse(updated));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── updateRestrictedAdmin ────────────────────────────────────────────────────
+
+/**
+ * PUT /api/layers/:id/restricted
+ *
+ * Admin-only.  Sets the restricted access-control flag on a layer.
+ *
+ * Body: { "restricted": true | false }
+ *
+ * Errors:
+ *   400 — missing / wrong-type body field
+ *   403 — non-admin caller (enforced by requireAdmin middleware, not here)
+ *   404 — layer not found
+ */
+export async function updateRestrictedAdmin(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+    const body   = req.body as { restricted?: unknown };
+
+    if (typeof body.restricted !== 'boolean') {
+      return next(new AppError('restricted must be a boolean', 400));
+    }
+
+    const updated = await setLayerRestricted(id, body.restricted);
     res.status(200).json(successResponse(updated));
   } catch (err) {
     next(err);
