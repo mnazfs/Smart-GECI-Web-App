@@ -31,6 +31,12 @@ export const env = {
   // CORS
   CORS_ORIGIN: optionalEnv('CORS_ORIGIN', 'http://localhost:5173'),
 
+  // GeoServer
+  GEOSERVER_URL:               optionalEnv('GEOSERVER_URL', 'http://localhost:8080/geoserver'),
+  GEOSERVER_USER:              optionalEnv('GEOSERVER_USER', 'admin'),
+  GEOSERVER_PASSWORD:          optionalEnv('GEOSERVER_PASSWORD', 'geoserver'),
+  GEOSERVER_DEFAULT_WORKSPACE: optionalEnv('GEOSERVER_DEFAULT_WORKSPACE', 'smart_geci'),
+
   get isDevelopment() { return this.NODE_ENV === 'development'; },
   get isProduction()  { return this.NODE_ENV === 'production'; },
 } as const;

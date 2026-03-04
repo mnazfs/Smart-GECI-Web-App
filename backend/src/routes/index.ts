@@ -1,14 +1,13 @@
 import { Router } from 'express';
 import healthRouter from './health';
-// Future routes will be imported and mounted here:
-// import layersRouter    from './layers';
+import layersRouter from './layers';
 // import facilitiesRouter from './facilities';
 // import authRouter       from './auth';
 
 const router = Router();
 
-router.use('/health',     healthRouter);
-// router.use('/layers',     layersRouter);
+router.use('/health', healthRouter);
+router.use('/layers', layersRouter);
 // router.use('/facilities', facilitiesRouter);
 // router.use('/auth',       authRouter);
 
