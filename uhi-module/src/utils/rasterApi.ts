@@ -28,7 +28,7 @@ export type RasterSummary = {
 /**
  * Base URL for the analytics API
  */
-const API_BASE_URL = 'http://localhost:8000';
+const API_BASE_URL = 'http://localhost:8002';
 
 /**
  * Fetch raster statistics summary for all layers.

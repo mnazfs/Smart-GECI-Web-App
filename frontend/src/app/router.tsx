@@ -3,6 +3,7 @@ import MapPage from "@/pages/MapPage";
 import LoginPage from "@/pages/LoginPage";
 import AdminPage from "@/pages/AdminPage";
 import NlpPage from "@/pages/NlpPage";
+import UHIModulePage from "@/pages/UHIModulePage";
 import NotFound from "@/pages/NotFound";
 import ProtectedRoute from "@/components/ProtectedRoute";
 
@@ -24,6 +25,14 @@ const AppRouter = () => {
         element={
           <ProtectedRoute requiredRole="authorized">
             <NlpPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/uhi-dashboard"
+        element={
+          <ProtectedRoute requiredRole="authorized">
+            <UHIModulePage />
           </ProtectedRoute>
         }
       />
