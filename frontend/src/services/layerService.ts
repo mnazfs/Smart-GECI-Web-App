@@ -13,6 +13,7 @@ interface BackendLayer {
   parentId: string | null;
   restricted: boolean;
   visible: boolean;
+  renderMode: 'wms' | 'wfs';
 }
 
 /**
@@ -32,6 +33,7 @@ export async function fetchAdminLayerTree(): Promise<LayerNode[]> {
       geoserverName: layer.geoserverName,
       parentId: layer.parentId,
       restricted: layer.restricted,
+      renderMode: layer.renderMode ?? 'wms',
       children: [],
     });
   }
@@ -75,6 +77,16 @@ export async function setLayerRestricted(
   restricted: boolean
 ): Promise<void> {
   await apiClient.patch(`/layers/${id}/restricted`, { restricted });
+}
+
+/**
+ * Admin-only: sets the render mode (wms or wfs) of a single layer.
+ */
+export async function setLayerRenderMode(
+  id: string,
+  renderMode: 'wms' | 'wfs'
+): Promise<void> {
+  await apiClient.patch(`/layers/${id}/render-mode`, { renderMode });
 }
 
 export interface SyncResult {

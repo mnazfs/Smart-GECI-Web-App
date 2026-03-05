@@ -7,6 +7,7 @@ export interface LayerRow {
   parent_id:       string | null;  // UUID | NULL
   restricted:      boolean;
   visible:         boolean;
+  render_mode:     'wms' | 'wfs';
   created_at:      Date;
   updated_at:      Date;
 }
@@ -20,6 +21,7 @@ export interface Layer {
   parentId:      string | null;
   restricted:    boolean;
   visible:       boolean;
+  renderMode:    'wms' | 'wfs';
   createdAt:     Date;
   updatedAt:     Date;
 }
@@ -32,6 +34,7 @@ export interface InsertLayerInput {
   parentId?:     string | null;
   restricted?:   boolean;
   visible?:      boolean;
+  renderMode?:   'wms' | 'wfs';
 }
 
 export interface UpdateLayerParentInput {
@@ -44,6 +47,11 @@ export interface UpdateLayerRestrictedInput {
   restricted: boolean;
 }
 
+export interface UpdateLayerRenderModeInput {
+  id:         string;
+  renderMode: 'wms' | 'wfs';
+}
+
 // ─── Row → Model mapper ───────────────────────────────────────────────────────
 
 export function rowToLayer(row: LayerRow): Layer {
@@ -54,6 +62,7 @@ export function rowToLayer(row: LayerRow): Layer {
     parentId:      row.parent_id,
     restricted:    row.restricted,
     visible:       row.visible,
+    renderMode:    row.render_mode ?? 'wms',
     createdAt:     row.created_at,
     updatedAt:     row.updated_at,
   };
@@ -67,5 +76,6 @@ export interface LayerTreeNode {
   geoserverName: string;
   parentId:      string | null;
   restricted:    boolean;
+  renderMode:    'wms' | 'wfs';
   children:      LayerTreeNode[];
 }

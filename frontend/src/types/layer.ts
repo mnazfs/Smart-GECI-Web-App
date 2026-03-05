@@ -4,6 +4,7 @@ export interface LayerNode {
   geoserverName: string;
   parentId: string | null;
   restricted: boolean;
+  renderMode: 'wms' | 'wfs';
   children?: LayerNode[];
 }
 

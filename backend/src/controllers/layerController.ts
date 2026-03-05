@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { syncWorkspaceLayers } from '../services/geoserverService';
+import { syncWorkspaceLayers, fetchWfsFeatures } from '../services/geoserverService';
 import { getLayerHierarchy, setLayerParent, setLayerRestricted } from '../services/layerService';
 import { LayerRepository }     from '../repositories/layerRepository';
 import { AppError }            from '../middleware/errorHandler';
@@ -206,6 +206,73 @@ export async function updateRestrictedAdmin(
     }
 
     const updated = await setLayerRestricted(id, body.restricted);
+    res.status(200).json(successResponse(updated));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── getWfsData ──────────────────────────────────────────────────────────────
+
+/**
+ * GET /api/layers/:id/wfs-data
+ *
+ * Server-side proxy for WFS GetFeature requests.
+ * Fetches GeoJSON from GeoServer and forwards it, avoiding browser CORS issues.
+ */
+export async function getWfsData(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id } = req.params as { id: string };
+
+    const layer = await LayerRepository.findById(id);
+    if (!layer) {
+      return next(new AppError(`Layer ${id} not found`, 404));
+    }
+
+    const geojson = await fetchWfsFeatures(layer.geoserverName);
+    res.status(200).json(geojson);
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── updateRenderMode ─────────────────────────────────────────────────────────
+
+/**
+ * PATCH /api/layers/:id/render-mode
+ *
+ * Sets how the layer is served to the map client (wms or wfs).
+ *
+ * Body: { "renderMode": "wms" | "wfs" }
+ *
+ * Errors:
+ *   400 — missing / invalid renderMode value
+ *   404 — layer not found
+ */
+export async function updateRenderMode(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { id }   = req.params as { id: string };
+    const body     = req.body as { renderMode?: unknown };
+    const rawMode  = body.renderMode;
+
+    if (rawMode !== 'wms' && rawMode !== 'wfs') {
+      return next(new AppError('renderMode must be "wms" or "wfs"', 400));
+    }
+
+    const updated = await LayerRepository.updateLayerRenderMode({ id, renderMode: rawMode });
+
+    if (!updated) {
+      return next(new AppError(`Layer ${id} not found`, 404));
+    }
+
     res.status(200).json(successResponse(updated));
   } catch (err) {
     next(err);

@@ -6,6 +6,8 @@ import {
   updateRestricted,
   updateParentAdmin,
   updateRestrictedAdmin,
+  updateRenderMode,
+  getWfsData,
 } from '../controllers/layerController';
 import { requireAdmin } from '../middleware/roleMiddleware';
 
@@ -51,5 +53,19 @@ router.put('/:id/parent', updateParentAdmin);
  * Body: { "restricted": true | false }
  */
 router.put('/:id/restricted', requireAdmin, updateRestrictedAdmin);
+
+/**
+ * PATCH /api/layers/:id/render-mode
+ * Sets how the layer is served: 'wms' (tile layer) or 'wfs' (GeoJSON vector).
+ * Body: { "renderMode": "wms" | "wfs" }
+ */
+router.patch('/:id/render-mode', updateRenderMode);
+
+/**
+ * GET /api/layers/:id/wfs-data
+ * Server-side proxy: fetches GeoJSON features from GeoServer WFS and
+ * returns them to the browser, bypassing browser CORS restrictions.
+ */
+router.get('/:id/wfs-data', getWfsData);
 
 export default router;

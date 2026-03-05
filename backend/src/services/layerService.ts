@@ -37,6 +37,7 @@ function buildTree(layers: Layer[], role: UserRole): LayerTreeNode[] {
       geoserverName: layer.geoserverName,
       parentId:      layer.parentId,
       restricted:    layer.restricted,
+      renderMode:    layer.renderMode,
       children:      [],
     });
   }

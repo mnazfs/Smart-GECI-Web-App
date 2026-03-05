@@ -40,6 +40,9 @@ const LayerRegistryPage = () => {
               <th className="text-center py-2 px-3 font-medium text-muted-foreground">
                 Access
               </th>
+              <th className="text-center py-2 px-3 font-medium text-muted-foreground">
+                Render
+              </th>
             </tr>
           </thead>
           <tbody>
@@ -67,6 +70,15 @@ const LayerRegistryPage = () => {
                       <Unlock className="h-3 w-3" /> Public
                     </span>
                   )}
+                </td>
+                <td className="py-2.5 px-3 text-center">
+                  <span className={`inline-flex items-center text-xs font-medium px-2 py-0.5 rounded-full ${
+                    layer.renderMode === 'wfs'
+                      ? 'bg-blue-500/10 text-blue-600'
+                      : 'bg-green-500/10 text-green-600'
+                  }`}>
+                    {(layer.renderMode ?? 'wms').toUpperCase()}
+                  </span>
                 </td>
               </tr>
             ))}

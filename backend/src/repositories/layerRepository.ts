@@ -6,6 +6,7 @@ import type {
   InsertLayerInput,
   UpdateLayerParentInput,
   UpdateLayerRestrictedInput,
+  UpdateLayerRenderModeInput,
 } from '../models/layer';
 import { rowToLayer } from '../models/layer';
 
@@ -46,6 +47,7 @@ export const LayerRepository = {
         parent_id,
         restricted,
         visible,
+        render_mode,
         created_at,
         updated_at
       FROM layer_registry
@@ -74,6 +76,7 @@ export const LayerRepository = {
         parent_id,
         restricted,
         visible,
+        render_mode,
         created_at,
         updated_at
       FROM layer_registry
@@ -99,6 +102,7 @@ export const LayerRepository = {
         parent_id,
         restricted,
         visible,
+        render_mode,
         created_at,
         updated_at
       FROM layer_registry
@@ -126,9 +130,10 @@ export const LayerRepository = {
         geoserver_name,
         parent_id,
         restricted,
-        visible
+        visible,
+        render_mode
       )
-      VALUES ($1, $2, $3, $4, $5)
+      VALUES ($1, $2, $3, $4, $5, $6)
       RETURNING
         id,
         name,
@@ -136,6 +141,7 @@ export const LayerRepository = {
         parent_id,
         restricted,
         visible,
+        render_mode,
         created_at,
         updated_at
     `;
@@ -145,6 +151,7 @@ export const LayerRepository = {
       input.parentId   ?? null,
       input.restricted ?? false,
       input.visible    ?? true,
+      input.renderMode ?? 'wms',
     ];
     const conn   = client ?? db;
     const result = await conn.query<LayerRow>(query, params);
@@ -175,6 +182,7 @@ export const LayerRepository = {
         parent_id,
         restricted,
         visible,
+        render_mode,
         created_at,
         updated_at
     `;
@@ -206,11 +214,44 @@ export const LayerRepository = {
         parent_id,
         restricted,
         visible,
+        render_mode,
         created_at,
         updated_at
     `;
     const conn   = client ?? db;
     const result = await conn.query<LayerRow>(query, [input.restricted, input.id]);
+    return result.rows.length > 0 ? toLayer(result.rows[0]!) : null;
+  },
+
+  // ── updateLayerRenderMode ─────────────────────────────────────────────────
+
+  /**
+   * Sets the render_mode of a layer (wms or wfs).
+   * Returns the updated record or `null` if the id was not found.
+   */
+  async updateLayerRenderMode(
+    input: UpdateLayerRenderModeInput,
+    client?: PoolClient,
+  ): Promise<Layer | null> {
+    const query = `
+      UPDATE layer_registry
+      SET
+        render_mode = $1,
+        updated_at  = NOW()
+      WHERE id = $2
+      RETURNING
+        id,
+        name,
+        geoserver_name,
+        parent_id,
+        restricted,
+        visible,
+        render_mode,
+        created_at,
+        updated_at
+    `;
+    const conn   = client ?? db;
+    const result = await conn.query<LayerRow>(query, [input.renderMode, input.id]);
     return result.rows.length > 0 ? toLayer(result.rows[0]!) : null;
   },
 

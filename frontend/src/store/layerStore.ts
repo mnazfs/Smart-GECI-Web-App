@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { LayerNode } from '@/types/layer';
 import type { UserRole } from '@/types/auth';
-import { setLayerParent, setLayerRestricted, fetchAdminLayerTree } from '@/services/layerService';
+import { setLayerParent, setLayerRestricted, setLayerRenderMode, fetchAdminLayerTree } from '@/services/layerService';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -49,6 +49,8 @@ interface LayerState {
   moveLayer: (id: string, newParentId: string | null) => Promise<void>;
   /** Admin: toggle the restricted flag on a single layer. */
   toggleRestricted: (id: string) => Promise<void>;
+  /** Admin: set the render mode (wms/wfs) on a single layer. */
+  setRenderMode: (id: string, mode: 'wms' | 'wfs') => Promise<void>;
 }
 
 // ─── store ───────────────────────────────────────────────────────────────────
@@ -145,6 +147,15 @@ export const useLayerStore = create<LayerState>((set, get) => ({
       await Promise.all([get().fetchLayers(), get().fetchAdminLayers()]);
     } catch {
       set({ error: 'Failed to update layer restriction. Please try again.' });
+    }
+  },
+
+  setRenderMode: async (id, mode) => {
+    try {
+      await setLayerRenderMode(id, mode);
+      await Promise.all([get().fetchLayers(), get().fetchAdminLayers()]);
+    } catch {
+      set({ error: 'Failed to update layer render mode. Please try again.' });
     }
   },
 }));

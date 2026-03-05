@@ -19,6 +19,7 @@ interface LayerRowProps {
   allLayers: LayerNode[];   // flat list — drives the parent <select>
   onToggleRestricted: (id: string) => void;
   onSetParent: (id: string, parentId: string | null) => void;
+  onSetRenderMode: (id: string, mode: 'wms' | 'wfs') => void;
 }
 
 const LayerRow = ({
@@ -27,6 +28,7 @@ const LayerRow = ({
   allLayers,
   onToggleRestricted,
   onSetParent,
+  onSetRenderMode,
 }: LayerRowProps) => {
   const hasChildren = !!(layer.children && layer.children.length > 0);
 
@@ -78,6 +80,32 @@ const LayerRow = ({
           ))}
         </select>
 
+        {/* Render-mode toggle: WMS / WFS pill */}
+        <div className="flex items-center rounded-md border border-input overflow-hidden shrink-0 text-xs font-medium">
+          <button
+            onClick={() => onSetRenderMode(layer.id, 'wms')}
+            className={`px-2 py-1 transition-colors ${
+              (layer.renderMode ?? 'wms') === 'wms'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-background text-muted-foreground hover:bg-muted'
+            }`}
+            title="Use WMS tile layer"
+          >
+            WMS
+          </button>
+          <button
+            onClick={() => onSetRenderMode(layer.id, 'wfs')}
+            className={`px-2 py-1 transition-colors ${
+              layer.renderMode === 'wfs'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-background text-muted-foreground hover:bg-muted'
+            }`}
+            title="Use WFS GeoJSON vector layer"
+          >
+            WFS
+          </button>
+        </div>
+
         {/* Lock toggle */}
         <button
           onClick={() => onToggleRestricted(layer.id)}
@@ -108,6 +136,7 @@ const LayerRow = ({
           allLayers={allLayers}
           onToggleRestricted={onToggleRestricted}
           onSetParent={onSetParent}
+          onSetRenderMode={onSetRenderMode}
         />
       ))}
     </>
@@ -119,6 +148,7 @@ const LayerHierarchyEditor = () => {
   const fetchAdminLayers = useLayerStore((s) => s.fetchAdminLayers);
   const moveLayer = useLayerStore((s) => s.moveLayer);
   const toggleRestricted = useLayerStore((s) => s.toggleRestricted);
+  const setRenderMode = useLayerStore((s) => s.setRenderMode);
 
   useEffect(() => {
     fetchAdminLayers();
@@ -152,6 +182,7 @@ const LayerHierarchyEditor = () => {
               allLayers={allLayers}
               onToggleRestricted={toggleRestricted}
               onSetParent={moveLayer}
+              onSetRenderMode={setRenderMode}
             />
           ))
         )}

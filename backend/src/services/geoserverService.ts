@@ -139,6 +139,33 @@ export async function syncWorkspaceLayers(workspace: string): Promise<SyncResult
   };
 }
 
+// ─── fetchWfsFeatures ───────────────────────────────────────────────────────
+
+/**
+ * Fetches GeoJSON features for a layer from GeoServer WFS.
+ *
+ * Uses the existing authenticated geoserverClient so no extra credentials
+ * are needed. The response is returned as a parsed JS object (GeoJSON
+ * FeatureCollection) and forwarded directly to the browser by the controller.
+ *
+ * @param layerName - The GeoServer layer name (e.g. "smart_geci:CSE")
+ */
+export async function fetchWfsFeatures(layerName: string): Promise<unknown> {
+  const response = await geoserverClient.get('/ows', {
+    params: {
+      service:      'WFS',
+      version:      '2.0.0',
+      request:      'GetFeature',
+      typeName:     layerName,
+      outputFormat: 'application/json',
+    },
+    // GeoServer returns JSON — don't treat it as application/json by default
+    // when the response Content-Type might be text/plain; force JSON parse.
+    responseType: 'json',
+  });
+  return response.data;
+}
+
 // ─── error helpers ────────────────────────────────────────────────────────────
 
 function buildGeoServerErrorMessage(err: unknown, workspace: string): string {
