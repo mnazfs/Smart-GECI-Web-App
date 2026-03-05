@@ -48,7 +48,7 @@ const LoginPage = () => {
         </div>
 
         <p className="text-xs text-muted-foreground text-center mt-6">
-          Demo mode — no backend authentication required
+          Demo mode — uses pre-seeded backend accounts
         </p>
       </div>
     </div>
