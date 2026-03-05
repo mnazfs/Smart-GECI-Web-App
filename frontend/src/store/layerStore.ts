@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { LayerNode } from '@/types/layer';
 import type { UserRole } from '@/types/auth';
-import { fetchLayerHierarchy, setLayerParent, setLayerRestricted } from '@/services/layerService';
+import { setLayerParent, setLayerRestricted, fetchAdminLayerTree } from '@/services/layerService';
 
 // ─── helpers ────────────────────────────────────────────────────────────────
 
@@ -27,127 +27,18 @@ function filterTreeByRole(nodes: LayerNode[] | undefined, role: UserRole): Layer
     .map(node => ({ ...node, children: filterTreeByRole(node.children ?? [], role) }));
 }
 
-// ─── mock seed data (replaced by backend response later) ────────────────────
-
-const MOCK_LAYER_TREE: LayerNode[] = [
-  {
-    id: 'buildings',
-    name: 'Buildings',
-    geoserverName: 'smart_geci:buildings',
-    parentId: null,
-    restricted: false,
-    children: [
-      {
-        id: 'main_building',
-        name: 'Main Building',
-        geoserverName: 'smart_geci:main_building',
-        parentId: 'buildings',
-        restricted: false,
-      },
-      {
-        id: 'science_lab',
-        name: 'Science Laboratory',
-        geoserverName: 'smart_geci:science_lab',
-        parentId: 'buildings',
-        restricted: false,
-      },
-      {
-        id: 'admin_block',
-        name: 'Administration Block',
-        geoserverName: 'smart_geci:admin_block',
-        parentId: 'buildings',
-        restricted: true,
-      },
-    ],
-  },
-  {
-    id: 'infrastructure',
-    name: 'Infrastructure',
-    geoserverName: 'smart_geci:infrastructure',
-    parentId: null,
-    restricted: false,
-    children: [
-      {
-        id: 'water_network',
-        name: 'Water Network',
-        geoserverName: 'smart_geci:water_network',
-        parentId: 'infrastructure',
-        restricted: false,
-      },
-      {
-        id: 'power_grid',
-        name: 'Power Grid',
-        geoserverName: 'smart_geci:power_grid',
-        parentId: 'infrastructure',
-        restricted: true,
-      },
-      {
-        id: 'fiber_optic',
-        name: 'Fiber Optic Network',
-        geoserverName: 'smart_geci:fiber_optic',
-        parentId: 'infrastructure',
-        restricted: true,
-      },
-    ],
-  },
-  {
-    id: 'security',
-    name: 'Security',
-    geoserverName: 'smart_geci:security',
-    parentId: null,
-    restricted: true,
-    children: [
-      {
-        id: 'cctv_zones',
-        name: 'CCTV Zones',
-        geoserverName: 'smart_geci:cctv_zones',
-        parentId: 'security',
-        restricted: true,
-      },
-      {
-        id: 'access_control',
-        name: 'Access Control Points',
-        geoserverName: 'smart_geci:access_control',
-        parentId: 'security',
-        restricted: true,
-      },
-    ],
-  },
-  {
-    id: 'green_spaces',
-    name: 'Green Spaces',
-    geoserverName: 'smart_geci:green_spaces',
-    parentId: null,
-    restricted: false,
-    children: [
-      {
-        id: 'parks',
-        name: 'Parks & Gardens',
-        geoserverName: 'smart_geci:parks',
-        parentId: 'green_spaces',
-        restricted: false,
-      },
-      {
-        id: 'sports_fields',
-        name: 'Sports Fields',
-        geoserverName: 'smart_geci:sports_fields',
-        parentId: 'green_spaces',
-        restricted: false,
-      },
-    ],
-  },
-];
-
 // ─── store interface ──────────────────────────────────────────────────────────
 
 interface LayerState {
   layerTree: LayerNode[];
+  adminLayerTree: LayerNode[];
   activeLayerIds: string[];
   expandedNodes: string[];
   isLoading: boolean;
   error: string | null;
 
   fetchLayers: () => Promise<void>;
+  fetchAdminLayers: () => Promise<void>;
   setLayerTree: (tree: LayerNode[]) => void;
   toggleLayer: (id: string, role: UserRole) => void;
   toggleExpand: (id: string) => void;
@@ -163,20 +54,32 @@ interface LayerState {
 // ─── store ───────────────────────────────────────────────────────────────────
 
 export const useLayerStore = create<LayerState>((set, get) => ({
-  layerTree: MOCK_LAYER_TREE,
+  layerTree: [],
+  adminLayerTree: [],
   activeLayerIds: [],
-  expandedNodes: ['buildings', 'infrastructure', 'green_spaces'],
+  expandedNodes: [],
   isLoading: false,
   error: null,
 
   fetchLayers: async () => {
     set({ isLoading: true, error: null });
     try {
-      const tree = await fetchLayerHierarchy();
-      set({ layerTree: Array.isArray(tree) ? tree : MOCK_LAYER_TREE, isLoading: false });
+      // Fetch the complete unfiltered tree from /api/layers.
+      // Display filtering (hiding restricted from guests) is done
+      // client-side by getVisibleLayers(role) so demo logins work correctly.
+      const tree = await fetchAdminLayerTree();
+      set({ layerTree: Array.isArray(tree) ? tree : [], isLoading: false });
     } catch {
-      // Fall back to mock data so the app remains usable without a backend
-      set({ isLoading: false, error: 'Could not load layers from server. Using cached data.' });
+      set({ isLoading: false, error: 'Could not load layers from server.' });
+    }
+  },
+
+  fetchAdminLayers: async () => {
+    try {
+      const tree = await fetchAdminLayerTree();
+      set({ adminLayerTree: Array.isArray(tree) ? tree : [] });
+    } catch {
+      set({ error: 'Could not load admin layer list.' });
     }
   },
 
@@ -227,20 +130,19 @@ export const useLayerStore = create<LayerState>((set, get) => ({
   moveLayer: async (id, newParentId) => {
     try {
       await setLayerParent(id, newParentId);
-      // Re-fetch to get the canonical server state after the parent change
-      await get().fetchLayers();
+      await Promise.all([get().fetchLayers(), get().fetchAdminLayers()]);
     } catch {
       set({ error: 'Failed to update layer parent. Please try again.' });
     }
   },
 
   toggleRestricted: async (id) => {
-    const node = findNodeInTree(get().layerTree, id);
+    const node = findNodeInTree(get().adminLayerTree, id)
+              ?? findNodeInTree(get().layerTree, id);
     if (!node) return;
     try {
       await setLayerRestricted(id, !node.restricted);
-      // Re-fetch so the tree reflects the server-side change
-      await get().fetchLayers();
+      await Promise.all([get().fetchLayers(), get().fetchAdminLayers()]);
     } catch {
       set({ error: 'Failed to update layer restriction. Please try again.' });
     }

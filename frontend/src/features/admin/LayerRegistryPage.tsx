@@ -1,10 +1,16 @@
+import { useEffect } from "react";
 import { useLayerStore } from "@/store/layerStore";
 import { flattenTree } from "@/features/layers/layerUtils";
 import { Lock, Unlock, Database } from "lucide-react";
 
 const LayerRegistryPage = () => {
-  const layerTree = useLayerStore((s) => s.layerTree);
-  const allLayers = flattenTree(layerTree);
+  const adminLayerTree = useLayerStore((s) => s.adminLayerTree);
+  const fetchAdminLayers = useLayerStore((s) => s.fetchAdminLayers);
+  const allLayers = flattenTree(adminLayerTree);
+
+  useEffect(() => {
+    fetchAdminLayers();
+  }, [fetchAdminLayers]);
 
   return (
     <div>

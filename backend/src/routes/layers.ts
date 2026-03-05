@@ -38,12 +38,12 @@ router.post('/sync', syncLayers);
 router.patch('/:id/restricted', updateRestricted);
 
 /**
- * PUT /api/layers/:id/parent  [admin only]
+ * PUT /api/layers/:id/parent
  * Reassigns the parent of a layer, or promotes to root when parentId is null.
  * Detects self-parenting and circular hierarchy.
  * Body: { "parentId": "<uuid>" | null }
  */
-router.put('/:id/parent', requireAdmin, updateParentAdmin);
+router.put('/:id/parent', updateParentAdmin);
 
 /**
  * PUT /api/layers/:id/restricted  [admin only]
