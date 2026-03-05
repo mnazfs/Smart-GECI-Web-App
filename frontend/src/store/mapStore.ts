@@ -14,7 +14,7 @@ interface MapState {
 }
 
 export const useMapStore = create<MapState>((set) => ({
-  center: [11.0168, 76.9558], // Default to Coimbatore area
+  center: [9.8516, 76.9395], // 9°51'05.9"N 76°56'22.1"E
   zoom: 16,
   selectedMetadata: null,
   metadataPanelOpen: false,

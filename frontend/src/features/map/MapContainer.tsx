@@ -7,7 +7,7 @@ import { metadataService } from "@/services/metadataService";
 
 const GEOSERVER_URL =
   import.meta.env.VITE_GEOSERVER_URL ||
-  "https://geoserver.example.com/geoserver/wms";
+  "http://localhost:8080/geoserver/wms";
 
 const MapContainer = () => {
   const mapRef = useRef<L.Map | null>(null);
