@@ -1,23 +1,28 @@
-import type { ReactNode } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuthStore } from '@/store/authStore';
-import type { UserRole } from '@/types/auth';
+import { Navigate } from "react-router-dom";
+import { useAuthStore } from "@/store/authStore";
+import type { UserRole } from "@/types/auth";
 
 interface ProtectedRouteProps {
-  children: ReactNode;
+  children: React.ReactNode;
   requiredRole: UserRole;
 }
 
-/**
- * Renders `children` only when the current role matches `requiredRole`.
- * Works for both demo and real auth modes — role is always derived from the store.
- */
-export default function ProtectedRoute({ children, requiredRole }: ProtectedRouteProps) {
-  const role = useAuthStore(state => state.role);
+const ProtectedRoute = ({ children, requiredRole }: ProtectedRouteProps) => {
+  const role = useAuthStore((s) => s.role);
 
-  if (role !== requiredRole) {
+  if (requiredRole === "admin" && role !== "admin") {
     return <Navigate to="/" replace />;
   }
 
+  if (
+    requiredRole === "authorized" &&
+    role !== "authorized" &&
+    role !== "admin"
+  ) {
+    return <Navigate to="/login" replace />;
+  }
+
   return <>{children}</>;
-}
+};
+
+export default ProtectedRoute;

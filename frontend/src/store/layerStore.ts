@@ -1,221 +1,192 @@
-import { create } from 'zustand';
-import type { LayerNode } from '@/types/layer';
-import type { UserRole } from '@/types/auth';
-import { fetchLayerHierarchy } from '@/services/layerService';
-
-// ─── helpers ────────────────────────────────────────────────────────────────
-
-function findNodeInTree(tree: LayerNode[], id: string): LayerNode | undefined {
-  for (const node of tree) {
-    if (node.id === id) return node;
-    const found = findNodeInTree(node.children ?? [], id);
-    if (found) return found;
-  }
-  return undefined;
-}
-
-function getAllDescendantIds(node: LayerNode): string[] {
-  if (!node.children || node.children.length === 0) return [];
-  return node.children.flatMap(child => [child.id, ...getAllDescendantIds(child)]);
-}
-
-function filterTreeByRole(nodes: LayerNode[], role: UserRole): LayerNode[] {
-  if (role !== 'guest') return nodes;
-  return nodes
-    .filter(node => !node.restricted)
-    .map(node => ({ ...node, children: filterTreeByRole(node.children ?? [], role) }));
-}
-
-// ─── mock seed data (replaced by backend response later) ────────────────────
-
-const MOCK_LAYER_TREE: LayerNode[] = [
-  {
-    id: 'buildings',
-    name: 'Buildings',
-    geoserverName: 'smart_geci:buildings',
-    parentId: null,
-    restricted: false,
-    children: [
-      {
-        id: 'main_building',
-        name: 'Main Building',
-        geoserverName: 'smart_geci:main_building',
-        parentId: 'buildings',
-        restricted: false,
-      },
-      {
-        id: 'science_lab',
-        name: 'Science Laboratory',
-        geoserverName: 'smart_geci:science_lab',
-        parentId: 'buildings',
-        restricted: false,
-      },
-      {
-        id: 'admin_block',
-        name: 'Administration Block',
-        geoserverName: 'smart_geci:admin_block',
-        parentId: 'buildings',
-        restricted: true,
-      },
-    ],
-  },
-  {
-    id: 'infrastructure',
-    name: 'Infrastructure',
-    geoserverName: 'smart_geci:infrastructure',
-    parentId: null,
-    restricted: false,
-    children: [
-      {
-        id: 'water_network',
-        name: 'Water Network',
-        geoserverName: 'smart_geci:water_network',
-        parentId: 'infrastructure',
-        restricted: false,
-      },
-      {
-        id: 'power_grid',
-        name: 'Power Grid',
-        geoserverName: 'smart_geci:power_grid',
-        parentId: 'infrastructure',
-        restricted: true,
-      },
-      {
-        id: 'fiber_optic',
-        name: 'Fiber Optic Network',
-        geoserverName: 'smart_geci:fiber_optic',
-        parentId: 'infrastructure',
-        restricted: true,
-      },
-    ],
-  },
-  {
-    id: 'security',
-    name: 'Security',
-    geoserverName: 'smart_geci:security',
-    parentId: null,
-    restricted: true,
-    children: [
-      {
-        id: 'cctv_zones',
-        name: 'CCTV Zones',
-        geoserverName: 'smart_geci:cctv_zones',
-        parentId: 'security',
-        restricted: true,
-      },
-      {
-        id: 'access_control',
-        name: 'Access Control Points',
-        geoserverName: 'smart_geci:access_control',
-        parentId: 'security',
-        restricted: true,
-      },
-    ],
-  },
-  {
-    id: 'green_spaces',
-    name: 'Green Spaces',
-    geoserverName: 'smart_geci:green_spaces',
-    parentId: null,
-    restricted: false,
-    children: [
-      {
-        id: 'parks',
-        name: 'Parks & Gardens',
-        geoserverName: 'smart_geci:parks',
-        parentId: 'green_spaces',
-        restricted: false,
-      },
-      {
-        id: 'sports_fields',
-        name: 'Sports Fields',
-        geoserverName: 'smart_geci:sports_fields',
-        parentId: 'green_spaces',
-        restricted: false,
-      },
-    ],
-  },
-];
-
-// ─── store interface ──────────────────────────────────────────────────────────
+import { create } from "zustand";
+import type { LayerNode } from "@/types/layer";
+import type { UserRole } from "@/types/auth";
 
 interface LayerState {
   layerTree: LayerNode[];
   activeLayerIds: string[];
   expandedNodes: string[];
-  isLoading: boolean;
-  error: string | null;
-
-  fetchLayers: () => Promise<void>;
   setLayerTree: (tree: LayerNode[]) => void;
   toggleLayer: (id: string, role: UserRole) => void;
   toggleExpand: (id: string) => void;
   getVisibleLayers: (role: UserRole) => LayerNode[];
-  setLoading: (loading: boolean) => void;
-  setError: (error: string | null) => void;
+  moveLayer: (activeId: string, overId: string) => void;
+  toggleRestricted: (id: string) => void;
 }
 
-// ─── store ───────────────────────────────────────────────────────────────────
+const DEMO_LAYERS: LayerNode[] = [
+  {
+    id: "buildings",
+    name: "Buildings",
+    geoserverName: "campus:buildings",
+    parentId: null,
+    restricted: false,
+    children: [
+      {
+        id: "academic",
+        name: "Academic Buildings",
+        geoserverName: "campus:academic_buildings",
+        parentId: "buildings",
+        restricted: false,
+      },
+      {
+        id: "admin-buildings",
+        name: "Administrative Buildings",
+        geoserverName: "campus:admin_buildings",
+        parentId: "buildings",
+        restricted: true,
+      },
+    ],
+  },
+  {
+    id: "infrastructure",
+    name: "Infrastructure",
+    geoserverName: "campus:infrastructure",
+    parentId: null,
+    restricted: false,
+    children: [
+      {
+        id: "roads",
+        name: "Roads",
+        geoserverName: "campus:roads",
+        parentId: "infrastructure",
+        restricted: false,
+      },
+      {
+        id: "utilities",
+        name: "Utilities Network",
+        geoserverName: "campus:utilities",
+        parentId: "infrastructure",
+        restricted: true,
+      },
+    ],
+  },
+  {
+    id: "environment",
+    name: "Environment",
+    geoserverName: "campus:environment",
+    parentId: null,
+    restricted: false,
+    children: [
+      {
+        id: "greenery",
+        name: "Green Zones",
+        geoserverName: "campus:greenery",
+        parentId: "environment",
+        restricted: false,
+      },
+      {
+        id: "sensors",
+        name: "IoT Sensors",
+        geoserverName: "campus:sensors",
+        parentId: "environment",
+        restricted: true,
+      },
+    ],
+  },
+];
+
+function collectChildIds(node: LayerNode): string[] {
+  const ids: string[] = [];
+  if (node.children) {
+    for (const child of node.children) {
+      ids.push(child.id);
+      ids.push(...collectChildIds(child));
+    }
+  }
+  return ids;
+}
+
+function findNode(tree: LayerNode[], id: string): LayerNode | null {
+  for (const node of tree) {
+    if (node.id === id) return node;
+    if (node.children) {
+      const found = findNode(node.children, id);
+      if (found) return found;
+    }
+  }
+  return null;
+}
+
+function filterByRole(nodes: LayerNode[], role: UserRole): LayerNode[] {
+  return nodes.reduce<LayerNode[]>((acc, node) => {
+    if (node.restricted && role === "guest") return acc;
+    const filtered: LayerNode = {
+      ...node,
+      children: node.children ? filterByRole(node.children, role) : undefined,
+    };
+    acc.push(filtered);
+    return acc;
+  }, []);
+}
 
 export const useLayerStore = create<LayerState>((set, get) => ({
-  layerTree: MOCK_LAYER_TREE,
+  layerTree: DEMO_LAYERS,
   activeLayerIds: [],
-  expandedNodes: ['buildings', 'infrastructure', 'green_spaces'],
-  isLoading: false,
-  error: null,
-
-  fetchLayers: async () => {
-    set({ isLoading: true, error: null });
-    try {
-      const tree = await fetchLayerHierarchy();
-      set({ layerTree: tree, isLoading: false });
-    } catch {
-      // Fall back to mock data so the app remains usable without a backend
-      set({ isLoading: false, error: 'Could not load layers from server. Using cached data.' });
-    }
-  },
+  expandedNodes: [],
 
   setLayerTree: (tree) => set({ layerTree: tree }),
 
   toggleLayer: (id, role) => {
     const { layerTree, activeLayerIds } = get();
-    const node = findNodeInTree(layerTree, id);
+    const node = findNode(layerTree, id);
     if (!node) return;
-
-    // Guests cannot toggle restricted layers
-    if (node.restricted && role === 'guest') return;
+    if (node.restricted && role === "guest") return;
 
     const isActive = activeLayerIds.includes(id);
-    const descendantIds = getAllDescendantIds(node);
-    const affected = [id, ...descendantIds];
+    const childIds = collectChildIds(node);
 
     if (isActive) {
-      // Turn OFF node + all descendants
-      set({ activeLayerIds: activeLayerIds.filter(lid => !affected.includes(lid)) });
+      set({
+        activeLayerIds: activeLayerIds.filter(
+          (lid) => lid !== id && !childIds.includes(lid)
+        ),
+      });
     } else {
-      // Turn ON node + all descendants (respecting guest restrictions)
-      const toAdd = role === 'guest'
-        ? affected.filter(aid => {
-            const n = findNodeInTree(layerTree, aid);
-            return n !== undefined && !n.restricted;
-          })
-        : affected;
-      set({ activeLayerIds: [...new Set([...activeLayerIds, ...toAdd])] });
+      const validChildren = childIds.filter((cid) => {
+        const child = findNode(layerTree, cid);
+        return child && (!child.restricted || role !== "guest");
+      });
+      set({
+        activeLayerIds: [...new Set([...activeLayerIds, id, ...validChildren])],
+      });
     }
   },
 
   toggleExpand: (id) => {
     const { expandedNodes } = get();
-    const isExpanded = expandedNodes.includes(id);
     set({
-      expandedNodes: isExpanded
-        ? expandedNodes.filter(nid => nid !== id)
+      expandedNodes: expandedNodes.includes(id)
+        ? expandedNodes.filter((n) => n !== id)
         : [...expandedNodes, id],
     });
   },
 
-  getVisibleLayers: (role) => filterTreeByRole(get().layerTree, role),
+  getVisibleLayers: (role) => {
+    return filterByRole(get().layerTree, role);
+  },
 
-  setLoading: (loading) => set({ isLoading: loading }),
-  setError: (error) => set({ error }),
+  moveLayer: (activeId, overId) => {
+    const { layerTree } = get();
+    // Simple reorder at top level for demo
+    const fromIdx = layerTree.findIndex((n) => n.id === activeId);
+    const toIdx = layerTree.findIndex((n) => n.id === overId);
+    if (fromIdx === -1 || toIdx === -1) return;
+    const newTree = [...layerTree];
+    const [moved] = newTree.splice(fromIdx, 1);
+    newTree.splice(toIdx, 0, moved);
+    set({ layerTree: newTree });
+  },
+
+  toggleRestricted: (id) => {
+    const { layerTree } = get();
+    function toggle(nodes: LayerNode[]): LayerNode[] {
+      return nodes.map((n) => ({
+        ...n,
+        restricted: n.id === id ? !n.restricted : n.restricted,
+        children: n.children ? toggle(n.children) : undefined,
+      }));
+    }
+    set({ layerTree: toggle(layerTree) });
+  },
 }));

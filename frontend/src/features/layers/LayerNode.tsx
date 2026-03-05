@@ -1,106 +1,79 @@
-import { memo, useCallback } from 'react';
-import type { LayerNode as LayerNodeType } from '@/types/layer';
-import { useLayerStore } from '@/store/layerStore';
-import { useAuthStore } from '@/store/authStore';
-import { getAllDescendantIds } from './layerUtils';
+import { memo, useCallback } from "react";
+import { ChevronRight, ChevronDown, Eye, EyeOff, Lock } from "lucide-react";
+import type { LayerNode as LayerNodeType } from "@/types/layer";
+import { useLayerStore } from "@/store/layerStore";
+import { useAuthStore } from "@/store/authStore";
 
 interface LayerNodeProps {
   node: LayerNodeType;
   depth: number;
 }
 
-/**
- * A single node in the layer tree.
- * Memoized — only re-renders when its own data changes.
- */
-const LayerNode = memo(function LayerNode({ node, depth }: LayerNodeProps) {
-  const role           = useAuthStore(state => state.role);
-  const activeLayerIds = useLayerStore(state => state.activeLayerIds);
-  const expandedNodes  = useLayerStore(state => state.expandedNodes);
-  const toggleLayer    = useLayerStore(state => state.toggleLayer);
-  const toggleExpand   = useLayerStore(state => state.toggleExpand);
+const LayerNode = memo(({ node, depth }: LayerNodeProps) => {
+  const activeLayerIds = useLayerStore((s) => s.activeLayerIds);
+  const expandedNodes = useLayerStore((s) => s.expandedNodes);
+  const toggleLayer = useLayerStore((s) => s.toggleLayer);
+  const toggleExpand = useLayerStore((s) => s.toggleExpand);
+  const role = useAuthStore((s) => s.role);
 
-  const hasChildren   = (node.children?.length ?? 0) > 0;
-  const isExpanded    = expandedNodes.includes(node.id);
-  const isActive      = activeLayerIds.includes(node.id);
-  const isRestricted  = node.restricted;
-
-  // A parent is "partially" checked when some but not all descendants are active
-  const descendantIds = hasChildren ? getAllDescendantIds(node) : [];
-  const activeDescendants = descendantIds.filter(id => activeLayerIds.includes(id));
-  const isIndeterminate =
-    hasChildren &&
-    activeDescendants.length > 0 &&
-    activeDescendants.length < descendantIds.length &&
-    !isActive;
+  const isActive = activeLayerIds.includes(node.id);
+  const isExpanded = expandedNodes.includes(node.id);
+  const hasChildren = node.children && node.children.length > 0;
 
   const handleToggle = useCallback(() => {
     toggleLayer(node.id, role);
-  }, [toggleLayer, node.id, role]);
+  }, [node.id, role, toggleLayer]);
 
   const handleExpand = useCallback(() => {
-    if (hasChildren) toggleExpand(node.id);
-  }, [toggleExpand, node.id, hasChildren]);
-
-  const indentPx = depth * 16;
+    toggleExpand(node.id);
+  }, [node.id, toggleExpand]);
 
   return (
     <div>
       <div
-        className={`flex items-center gap-2.5 px-2.5 py-2 rounded-lg cursor-pointer group transition-all duration-150 ${
-          isActive ? 'bg-gradient-to-r from-emerald-50 to-emerald-50/50 shadow-sm' : 'hover:bg-slate-50'
-        }`}
-        style={{ paddingLeft: `${10 + indentPx}px` }}
+        className="flex items-center gap-1.5 py-1.5 px-2 rounded-md hover:bg-muted/60 transition-colors cursor-pointer group"
+        style={{ paddingLeft: `${depth * 16 + 8}px` }}
       >
-        {/* expand/collapse toggle */}
+        {hasChildren ? (
+          <button
+            onClick={handleExpand}
+            className="p-0.5 rounded hover:bg-muted"
+            aria-label={isExpanded ? "Collapse" : "Expand"}
+          >
+            {isExpanded ? (
+              <ChevronDown className="h-3.5 w-3.5 text-muted-foreground" />
+            ) : (
+              <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+            )}
+          </button>
+        ) : (
+          <span className="w-5" />
+        )}
+
         <button
-          onClick={handleExpand}
-          className={`w-4 h-4 flex items-center justify-center text-slate-400 shrink-0 transition-all duration-200 ${
-            hasChildren ? 'hover:text-slate-600 hover:scale-110' : 'cursor-default'
-          } ${isExpanded ? 'rotate-90' : ''}`}
-          tabIndex={-1}
-          aria-label={isExpanded ? 'Collapse' : 'Expand'}
+          onClick={handleToggle}
+          className="p-0.5 rounded hover:bg-muted"
+          aria-label={isActive ? "Hide layer" : "Show layer"}
         >
-          {hasChildren ? '▶' : ''}
+          {isActive ? (
+            <Eye className="h-3.5 w-3.5 text-accent" />
+          ) : (
+            <EyeOff className="h-3.5 w-3.5 text-muted-foreground" />
+          )}
         </button>
 
-        {/* checkbox */}
-        <input
-          type="checkbox"
-          className="w-4 h-4 rounded accent-emerald-500 cursor-pointer shrink-0 transition-transform hover:scale-110"
-          checked={isActive}
-          ref={el => {
-            if (el) el.indeterminate = isIndeterminate;
-          }}
-          onChange={handleToggle}
-          aria-label={`Toggle ${node.name}`}
-        />
-
-        {/* label */}
-        <span
-          className={`text-sm truncate flex-1 transition-colors ${
-            isActive ? 'text-slate-900 font-semibold' : 'text-slate-600 group-hover:text-slate-800'
-          }`}
-          title={node.name}
-        >
+        <span className="text-sm font-medium text-panel-foreground flex-1 truncate">
           {node.name}
         </span>
 
-        {/* restricted badge */}
-        {isRestricted && (
-          <span
-            className="text-xs px-1.5 py-0.5 rounded-md bg-amber-100 text-amber-700 font-medium shrink-0 shadow-sm"
-            title="Restricted layer"
-          >
-            🔒
-          </span>
+        {node.restricted && (
+          <Lock className="h-3 w-3 text-warning opacity-70" />
         )}
       </div>
 
-      {/* children */}
       {hasChildren && isExpanded && (
-        <div className="mt-0.5">
-          {node.children!.map(child => (
+        <div>
+          {node.children!.map((child) => (
             <LayerNode key={child.id} node={child} depth={depth + 1} />
           ))}
         </div>
@@ -108,5 +81,7 @@ const LayerNode = memo(function LayerNode({ node, depth }: LayerNodeProps) {
     </div>
   );
 });
+
+LayerNode.displayName = "LayerNode";
 
 export default LayerNode;

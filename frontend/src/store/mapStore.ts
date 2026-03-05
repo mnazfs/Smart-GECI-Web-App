@@ -1,50 +1,29 @@
-import { create } from 'zustand';
-
-// ─── types ────────────────────────────────────────────────────────────────────
-
-export interface FacilityMetadata {
-  id: string;
-  name: string;
-  type: string;
-  description?: string;
-  properties: Record<string, string | number | boolean>;
-}
-
-export interface ClickedLocation {
-  lat: number;
-  lng: number;
-}
-
-// ─── store interface ──────────────────────────────────────────────────────────
+import { create } from "zustand";
+import type { FacilityMetadata } from "@/types/layer";
 
 interface MapState {
-  metadata: FacilityMetadata | null;
-  isMetadataPanelOpen: boolean;
-  clickedLocation: ClickedLocation | null;
-  isLoadingMetadata: boolean;
-  metadataError: string | null;
-
-  setMetadata: (metadata: FacilityMetadata | null) => void;
+  center: [number, number];
+  zoom: number;
+  selectedMetadata: FacilityMetadata | null;
+  metadataPanelOpen: boolean;
+  setCenter: (center: [number, number]) => void;
+  setZoom: (zoom: number) => void;
+  setSelectedMetadata: (metadata: FacilityMetadata | null) => void;
   openMetadataPanel: () => void;
   closeMetadataPanel: () => void;
-  setClickedLocation: (location: ClickedLocation | null) => void;
-  setLoadingMetadata: (loading: boolean) => void;
-  setMetadataError: (error: string | null) => void;
 }
 
-// ─── store ───────────────────────────────────────────────────────────────────
-
 export const useMapStore = create<MapState>((set) => ({
-  metadata: null,
-  isMetadataPanelOpen: false,
-  clickedLocation: null,
-  isLoadingMetadata: false,
-  metadataError: null,
+  center: [11.0168, 76.9558], // Default to Coimbatore area
+  zoom: 16,
+  selectedMetadata: null,
+  metadataPanelOpen: false,
 
-  setMetadata: (metadata) => set({ metadata }),
-  openMetadataPanel: () => set({ isMetadataPanelOpen: true }),
-  closeMetadataPanel: () => set({ isMetadataPanelOpen: false, metadata: null }),
-  setClickedLocation: (location) => set({ clickedLocation: location }),
-  setLoadingMetadata: (loading) => set({ isLoadingMetadata: loading }),
-  setMetadataError: (error) => set({ metadataError: error }),
+  setCenter: (center) => set({ center }),
+  setZoom: (zoom) => set({ zoom }),
+  setSelectedMetadata: (metadata) =>
+    set({ selectedMetadata: metadata, metadataPanelOpen: !!metadata }),
+  openMetadataPanel: () => set({ metadataPanelOpen: true }),
+  closeMetadataPanel: () =>
+    set({ metadataPanelOpen: false, selectedMetadata: null }),
 }));

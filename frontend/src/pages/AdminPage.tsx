@@ -1,67 +1,72 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
-import Navbar from '@/components/Navbar';
-import LayerRegistryPage from '@/features/admin/LayerRegistryPage';
-import LayerHierarchyEditor from '@/features/admin/LayerHierarchyEditor';
+import { lazy, Suspense, useState } from "react";
+import { Link } from "react-router-dom";
+import { ArrowLeft, Layers, GitBranch } from "lucide-react";
 
-type AdminTab = 'registry' | 'hierarchy';
+const LayerRegistryPage = lazy(
+  () => import("@/features/admin/LayerRegistryPage")
+);
+const LayerHierarchyEditor = lazy(
+  () => import("@/features/admin/LayerHierarchyEditor")
+);
 
-const TABS: { id: AdminTab; label: string; icon: string }[] = [
-  { id: 'registry',  label: 'Layer Registry',    icon: '🗂️' },
-  { id: 'hierarchy', label: 'Hierarchy Editor',   icon: '⚙️' },
-];
+type AdminTab = "registry" | "hierarchy";
 
-export default function AdminPage() {
-  const [activeTab, setActiveTab] = useState<AdminTab>('registry');
-  const navigate = useNavigate();
+const AdminPage = () => {
+  const [activeTab, setActiveTab] = useState<AdminTab>("registry");
 
   return (
-    <div className="flex flex-col h-screen w-screen overflow-hidden bg-slate-50">
-      <Navbar />
-
-      <div className="flex-1 overflow-y-auto">
-        {/* ── page header ── */}
-        <div className="bg-white border-b border-slate-200/50 px-8 py-6 shadow-sm">
-          <div className="flex items-center justify-between max-w-7xl mx-auto">
-            <div>
-              <h1 className="text-2xl font-bold text-slate-900">Admin Console</h1>
-              <p className="text-sm text-slate-600 mt-1.5">
-                Manage GIS layer configuration and hierarchy
-              </p>
-            </div>
-            <button
-              onClick={() => navigate('/')}
-              className="text-sm text-slate-600 hover:text-slate-900 transition-all duration-200 flex items-center gap-2 px-4 py-2 rounded-lg hover:bg-slate-100 font-medium"
-            >
-              ← Back to Map
-            </button>
-          </div>
-
-          {/* ── tabs ── */}
-          <div className="flex gap-2 mt-6 max-w-7xl mx-auto">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                className={`flex items-center gap-2.5 px-5 py-2.5 rounded-lg text-sm font-semibold transition-all duration-200 ${
-                  activeTab === tab.id
-                    ? 'bg-gradient-to-r from-blue-500 to-blue-600 text-white shadow-md'
-                    : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
-                }`}
-              >
-                <span className="text-base">{tab.icon}</span>
-                {tab.label}
-              </button>
-            ))}
-          </div>
+    <div className="flex-1 overflow-y-auto bg-background">
+      <div className="max-w-4xl mx-auto px-6 py-6">
+        <div className="flex items-center gap-3 mb-6">
+          <Link
+            to="/"
+            className="p-1.5 rounded-md hover:bg-muted transition-colors"
+            aria-label="Back to map"
+          >
+            <ArrowLeft className="h-4 w-4 text-muted-foreground" />
+          </Link>
+          <h1 className="text-xl font-bold text-foreground">Admin Console</h1>
         </div>
 
-        {/* ── tab content ── */}
-        <div className="p-8 max-w-7xl mx-auto">
-          {activeTab === 'registry'  && <LayerRegistryPage />}
-          {activeTab === 'hierarchy' && <LayerHierarchyEditor />}
+        <div className="flex gap-1 mb-6 border-b border-border">
+          <button
+            onClick={() => setActiveTab("registry")}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "registry"
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Layers className="h-4 w-4" />
+            Layer Registry
+          </button>
+          <button
+            onClick={() => setActiveTab("hierarchy")}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "hierarchy"
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <GitBranch className="h-4 w-4" />
+            Hierarchy Editor
+          </button>
         </div>
+
+        <Suspense
+          fallback={
+            <div className="text-sm text-muted-foreground">Loading...</div>
+          }
+        >
+          {activeTab === "registry" ? (
+            <LayerRegistryPage />
+          ) : (
+            <LayerHierarchyEditor />
+          )}
+        </Suspense>
       </div>
     </div>
   );
-}
+};
+
+export default AdminPage;

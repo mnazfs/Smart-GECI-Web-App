@@ -1,26 +1,31 @@
-import api from './api';
-import { getDemoRoleHeaders } from '@/store/authStore';
-import type { FacilityMetadata } from '@/store/mapStore';
+import { apiClient } from "./api";
+import type { FacilityMetadata } from "@/types/layer";
 
-interface ByLocationParams {
-  lat: number;
-  lng: number;
-}
-
-/**
- * Fetch facility metadata closest to the clicked map coordinate.
- * - Demo mode: sends x-role header.
- * - Real mode: JWT is attached automatically by api.ts interceptor.
- */
-export async function fetchFacilityByLocation(
-  params: ByLocationParams,
-): Promise<FacilityMetadata | null> {
-  const response = await api.get<FacilityMetadata | null>(
-    '/facilities/by-location',
-    {
-      params,
-      headers: getDemoRoleHeaders(),
-    },
-  );
-  return response.data;
-}
+export const metadataService = {
+  fetchByLocation: async (
+    lat: number,
+    lng: number
+  ): Promise<FacilityMetadata | null> => {
+    try {
+      const response = await apiClient.get<FacilityMetadata>(
+        "/facilities/by-location",
+        { params: { lat, lng } }
+      );
+      return response.data;
+    } catch {
+      // Demo fallback
+      return {
+        id: "demo-facility",
+        name: "Campus Building",
+        type: "Academic",
+        description: "A facility on the GECI campus.",
+        location: { lat, lng },
+        properties: {
+          Floor: "3",
+          Capacity: "200",
+          "Year Built": "2015",
+        },
+      };
+    }
+  },
+};
