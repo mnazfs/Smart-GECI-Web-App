@@ -1,6 +1,6 @@
 import { Link, useNavigate } from "react-router-dom";
 import { useAuthStore } from "@/store/authStore";
-import { LogIn, LogOut, Shield, MapPin } from "lucide-react";
+import { LogIn, LogOut, MessageSquare, Shield, MapPin } from "lucide-react";
 
 const Navbar = () => {
   const { role, logout } = useAuthStore();
@@ -23,6 +23,16 @@ const Navbar = () => {
       </Link>
 
       <div className="flex items-center gap-2">
+        {isAuthenticated && (
+          <Link
+            to="/nlp"
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-navbar-foreground/20 text-navbar-foreground hover:bg-navbar-foreground/10 transition-colors"
+          >
+            <MessageSquare className="h-3.5 w-3.5" />
+            Ask GECI
+          </Link>
+        )}
+
         {isAdmin && (
           <Link
             to="/admin"
