@@ -8,6 +8,7 @@ import {
   updateRestrictedAdmin,
   updateRenderMode,
   getWfsData,
+  getFeatureInfo,
 } from '../controllers/layerController';
 import { requireAdmin } from '../middleware/roleMiddleware';
 
@@ -24,6 +25,12 @@ router.get('/', getLayers);
  * Returns all visible layers as a nested tree (built in memory, no recursive SQL).
  */
 router.get('/hierarchy', getHierarchy);
+
+/**
+ * GET /api/layers/feature-info?layers=...&bbox=...&width=...&height=...&x=...&y=...
+ * Server-side proxy for WMS GetFeatureInfo — avoids browser CORS restrictions.
+ */
+router.get('/feature-info', getFeatureInfo);
 
 /**
  * POST /api/layers/sync

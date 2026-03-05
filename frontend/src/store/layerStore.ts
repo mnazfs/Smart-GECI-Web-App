@@ -14,11 +14,6 @@ function findNodeInTree(tree: LayerNode[], id: string): LayerNode | undefined {
   return undefined;
 }
 
-function getAllDescendantIds(node: LayerNode): string[] {
-  if (!node.children || node.children.length === 0) return [];
-  return node.children.flatMap(child => [child.id, ...getAllDescendantIds(child)]);
-}
-
 function filterTreeByRole(nodes: LayerNode[] | undefined, role: UserRole): LayerNode[] {
   if (!nodes) return [];
   if (role !== 'guest') return nodes;
@@ -96,21 +91,13 @@ export const useLayerStore = create<LayerState>((set, get) => ({
     if (node.restricted && role === 'guest') return;
 
     const isActive = activeLayerIds.includes(id);
-    const descendantIds = getAllDescendantIds(node);
-    const affected = [id, ...descendantIds];
 
     if (isActive) {
-      // Turn OFF node + all descendants
-      set({ activeLayerIds: activeLayerIds.filter(lid => !affected.includes(lid)) });
+      // Turn OFF this node only
+      set({ activeLayerIds: activeLayerIds.filter(lid => lid !== id) });
     } else {
-      // Turn ON node + all descendants (respecting guest restrictions)
-      const toAdd = role === 'guest'
-        ? affected.filter(aid => {
-            const n = findNodeInTree(layerTree, aid);
-            return n !== undefined && !n.restricted;
-          })
-        : affected;
-      set({ activeLayerIds: [...new Set([...activeLayerIds, ...toAdd])] });
+      // Turn ON this node only
+      set({ activeLayerIds: [...new Set([...activeLayerIds, id])] });
     }
   },
 

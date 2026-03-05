@@ -166,6 +166,47 @@ export async function fetchWfsFeatures(layerName: string): Promise<unknown> {
   return response.data;
 }
 
+// ─── fetchGetFeatureInfo ───────────────────────────────────────────────────────
+
+export interface GetFeatureInfoParams {
+  layers: string;
+  bbox: string;
+  width: number;
+  height: number;
+  x: number;
+  y: number;
+  srs?: string;
+}
+
+/**
+ * Issues a WMS GetFeatureInfo request to GeoServer and returns the parsed
+ * GeoJSON FeatureCollection. Runs server-side so the browser is never
+ * exposed to a cross-origin request.
+ */
+export async function fetchGetFeatureInfo(
+  params: GetFeatureInfoParams,
+): Promise<unknown> {
+  const response = await geoserverClient.get('/wms', {
+    params: {
+      service:      'WMS',
+      version:      '1.1.1',
+      request:      'GetFeatureInfo',
+      layers:       params.layers,
+      query_layers: params.layers,
+      srs:          params.srs ?? 'EPSG:4326',
+      bbox:         params.bbox,
+      width:        params.width,
+      height:       params.height,
+      x:            params.x,
+      y:            params.y,
+      info_format:  'application/json',
+      feature_count: 1,
+    },
+    responseType: 'json',
+  });
+  return response.data;
+}
+
 // ─── error helpers ────────────────────────────────────────────────────────────
 
 function buildGeoServerErrorMessage(err: unknown, workspace: string): string {

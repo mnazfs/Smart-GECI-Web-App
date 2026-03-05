@@ -1,5 +1,5 @@
 import type { Request, Response, NextFunction } from 'express';
-import { syncWorkspaceLayers, fetchWfsFeatures } from '../services/geoserverService';
+import { syncWorkspaceLayers, fetchWfsFeatures, fetchGetFeatureInfo } from '../services/geoserverService';
 import { getLayerHierarchy, setLayerParent, setLayerRestricted } from '../services/layerService';
 import { LayerRepository }     from '../repositories/layerRepository';
 import { AppError }            from '../middleware/errorHandler';
@@ -207,6 +207,42 @@ export async function updateRestrictedAdmin(
 
     const updated = await setLayerRestricted(id, body.restricted);
     res.status(200).json(successResponse(updated));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── getFeatureInfo ─────────────────────────────────────────────────────────
+
+/**
+ * GET /api/layers/feature-info?layers=...&bbox=...&width=...&height=...&x=...&y=...
+ *
+ * Server-side proxy for WMS GetFeatureInfo requests.
+ * Returns the GeoJSON FeatureCollection from GeoServer, bypassing browser CORS.
+ */
+export async function getFeatureInfo(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const { layers, bbox, width, height, x, y, srs } = req.query as Record<string, string>;
+
+    if (!layers || !bbox || !width || !height || !x || !y) {
+      return next(new AppError('Missing required query params: layers, bbox, width, height, x, y', 400));
+    }
+
+    const data = await fetchGetFeatureInfo({
+      layers,
+      bbox,
+      width:  parseInt(width,  10),
+      height: parseInt(height, 10),
+      x:      parseInt(x,      10),
+      y:      parseInt(y,      10),
+      srs,
+    });
+
+    res.status(200).json(data);
   } catch (err) {
     next(err);
   }
