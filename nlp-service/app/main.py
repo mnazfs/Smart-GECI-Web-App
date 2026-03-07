@@ -1,11 +1,16 @@
-from fastapi import FastAPI, BackgroundTasks
+from fastapi import FastAPI, BackgroundTasks, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
+from typing import List, Optional
 from app.routes import generate
 from app import config
 from app.rag.knowledge_loader import load_documents
-from app.rag.db_loader import load_database_documents
+from app.rag.db_loader import load_database_documents, get_available_tables
 from app.rag.vector_store import VectorStore
 from app.rag.vector_store_instance import set_vector_store, get_vector_store
+from app.rag.table_registry import load_registry, reset_registry, register_table
+from app.services.rag_incremental_loader import add_table_to_vectorstore
+import asyncio
 import os
 
 # Global RAG state
@@ -31,10 +36,22 @@ app.add_middleware(
 # Include routers
 app.include_router(generate.router, prefix="/api", tags=["generate"])
 
-def build_vector_store():
+class BuildRagRequest(BaseModel):
+    selected_tables: Optional[List[str]] = None
+
+
+class AddTableRequest(BaseModel):
+    table_name: str
+
+
+def build_vector_store(selected_tables: Optional[List[str]] = None):
     """
     Build RAG vector store with progress tracking.
     Updates global state: vectorstore, rag_building, rag_progress
+
+    Args:
+        selected_tables: Optional list of table names to include in the RAG.
+            If None or empty, all public tables are included.
     """
     global vectorstore, rag_building, rag_progress
     
@@ -69,11 +86,14 @@ def build_vector_store():
         rag_progress = 20
         
         # STEP 2: Load database documents with table summarization (20% -> 70% progress)
-        print("\n🗄️  Loading PostGIS documents...")
+        if selected_tables:
+            print(f"\n🗄️  Loading PostGIS documents from selected tables: {selected_tables}...")
+        else:
+            print("\n🗄️  Loading PostGIS documents from all tables...")
         rag_progress = 30
         
         try:
-            db_docs = load_database_documents()
+            db_docs = load_database_documents(selected_tables=selected_tables)
             
             if db_docs and len(db_docs) > 0:
                 all_documents.extend(db_docs)
@@ -130,6 +150,20 @@ def build_vector_store():
             print("✅ FAISS index built with 0 vectors")
         
         rag_progress = 100
+
+        # ── Reset registry to reflect what was just built ──────────────────────
+        print("📋 Updating table registry…")
+        reset_registry()
+        tables_to_register = selected_tables if selected_tables else []
+        if not tables_to_register:
+            # Full build with no explicit selection — register every public table
+            try:
+                tables_to_register = [t["table_name"] for t in get_available_tables()]
+            except Exception:
+                tables_to_register = []
+        for tbl in tables_to_register:
+            register_table(tbl, row_docs=0, summary_doc=True)
+        print(f"✓ Registry updated with {len(tables_to_register)} table(s)")
     
     except Exception as e:
         print(f"❌ Error initializing vector store: {str(e)}")
@@ -267,9 +301,71 @@ async def startup_event():
 #     print("✨ NLP Service startup complete")
 #     print("="*80 + "\n")
 
+@app.get("/db-tables")
+async def get_db_tables():
+    """Return all available tables from the connected PostgreSQL database.
+
+    Each entry includes an `in_kb` boolean indicating whether the table
+    has already been indexed in the vector store.
+    """
+    try:
+        tables = get_available_tables()
+        registry = load_registry()
+        indexed = registry.get("tables", {})
+        for t in tables:
+            t["in_kb"] = t["table_name"] in indexed
+        return {"success": True, "tables": tables}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/rag/tables-status")
+async def get_rag_tables_status():
+    """Return all public DB tables with their knowledge-base indexed status.
+
+    Response: list of {"table": str, "in_kb": bool}
+    """
+    try:
+        db_tables = get_available_tables()
+        registry = load_registry()
+        indexed = registry.get("tables", {})
+        return [
+            {"table": t["table_name"], "in_kb": t["table_name"] in indexed}
+            for t in db_tables
+        ]
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/rag/add-table")
+async def add_table_endpoint(body: AddTableRequest):
+    """Incrementally add a single PostGIS table to the vector store.
+
+    Does NOT rebuild the full index — only encodes the new table's documents
+    and appends them to the existing FAISS index.
+
+    Body: { "table_name": "<name>" }
+    """
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(
+        None, add_table_to_vectorstore, body.table_name
+    )
+    if not result["success"]:
+        raise HTTPException(status_code=400, detail=result["message"])
+    return result
+
+
 @app.post("/build-rag")
-async def build_rag(background_tasks: BackgroundTasks):
-    """Trigger RAG vector store build in background"""
+async def build_rag(background_tasks: BackgroundTasks, body: BuildRagRequest = BuildRagRequest()):
+    """Trigger RAG vector store build in background.
+
+    Accepts an optional JSON body: { "selected_tables": ["table1", "table2"] }
+    If selected_tables is omitted or empty, all public tables are used.
+    """
     global rag_building
 
     if rag_building:
@@ -279,7 +375,7 @@ async def build_rag(background_tasks: BackgroundTasks):
             "progress": rag_progress
         }
 
-    background_tasks.add_task(build_vector_store)
+    background_tasks.add_task(build_vector_store, body.selected_tables)
 
     return {
         "success": True,

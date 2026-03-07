@@ -21,6 +21,24 @@ export interface BuildRagResponse {
   progress?: number;
 }
 
+export interface DbTableColumn {
+  column_name: string;
+  data_type: string;
+}
+
+export interface DbTable {
+  table_name: string;
+  table_schema: string;
+  row_estimate: number;
+  columns: DbTableColumn[];
+  in_kb: boolean;
+}
+
+export interface DbTablesResponse {
+  success: boolean;
+  tables: DbTable[];
+}
+
 // ── Helpers ──────────────────────────────────────────────────────────────────
 
 /**
@@ -65,13 +83,45 @@ export async function fetchRagStatus(): Promise<RagStatusResponse> {
   return response.json();
 }
 
+/** GET /db-tables — list all available database tables */
+export async function fetchDbTables(): Promise<DbTablesResponse> {
+  const response = await fetch(`${NLP_SERVICE_URL}/db-tables`);
+  if (!response.ok)
+    throw new Error(`Fetch tables failed: ${response.status}`);
+  return response.json();
+}
+
 /** POST /build-rag — start building the knowledge base */
-export async function buildRag(): Promise<BuildRagResponse> {
+export async function buildRag(
+  selectedTables?: string[]
+): Promise<BuildRagResponse> {
   const response = await fetch(`${NLP_SERVICE_URL}/build-rag`, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ selected_tables: selectedTables ?? [] }),
   });
   if (!response.ok)
     throw new Error(`Build RAG request failed: ${response.status}`);
+  return response.json();
+}
+
+/** POST /rag/add-table — incrementally add a single table to the knowledge base */
+export async function addTableToKB(
+  tableName: string
+): Promise<{ success: boolean; message: string; added_docs?: number }> {
+  const response = await fetch(`${NLP_SERVICE_URL}/rag/add-table`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ table_name: tableName }),
+  });
+  if (!response.ok) {
+    // Surface the detail message from FastAPI 400 responses
+    let detail = `Add table request failed: ${response.status}`;
+    try {
+      const err = await response.json();
+      if (err.detail) detail = err.detail;
+    } catch { /* ignore */ }
+    throw new Error(detail);
+  }
   return response.json();
 }

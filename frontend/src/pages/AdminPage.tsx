@@ -93,7 +93,7 @@ const AdminPage = () => {
             }`}
           >
             <GitBranch className="h-4 w-4" />
-            Hierarchy Editor
+            Layer Config
           </button>
           <button
             onClick={() => setActiveTab("nlp")}

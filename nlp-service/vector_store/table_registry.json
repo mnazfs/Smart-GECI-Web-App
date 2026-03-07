@@ -1,0 +1,64 @@
+{
+  "tables": {
+    "buildings": {
+      "added_at": "2026-03-07T05:45:12.171971+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "cse": {
+      "added_at": "2026-03-07T05:45:12.180155+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "cse_1f": {
+      "added_at": "2026-03-07T05:45:12.188739+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "cse_2f": {
+      "added_at": "2026-03-07T05:45:12.197924+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "cse_3f": {
+      "added_at": "2026-03-07T05:45:12.206550+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "cse_gf": {
+      "added_at": "2026-03-07T05:45:12.216592+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "ece_1f": {
+      "added_at": "2026-03-07T05:45:12.226554+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "ece_gf": {
+      "added_at": "2026-03-07T05:45:12.235701+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "electric_posts": {
+      "added_at": "2026-03-07T05:45:12.245813+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "light_posts": {
+      "added_at": "2026-03-07T05:45:12.257635+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "roads": {
+      "added_at": "2026-03-07T05:45:12.268191+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    },
+    "trees": {
+      "added_at": "2026-03-07T05:45:12.278695+00:00",
+      "row_docs": 0,
+      "summary_doc": true
+    }
+  }
+}

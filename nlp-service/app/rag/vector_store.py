@@ -132,6 +132,49 @@ class VectorStore:
             print(f"❌ Error during retrieval: {str(e)}")
             raise Exception(f"Vector store retrieval failed: {str(e)}")
     
+    def add_documents(self, documents: List[str], folder_path: str = "vector_store"):
+        """
+        Incrementally add new documents to the existing vector store.
+
+        Encodes the new documents, appends them to the existing FAISS index
+        and document list, then persists the updated store to disk.
+
+        Args:
+            documents: List of text chunks to add
+            folder_path: Path used to persist the updated store (default: "vector_store")
+        """
+        if not documents:
+            print("⚠️  No documents to add")
+            return
+
+        print(f"➕ Adding {len(documents)} new document(s) to vector store…")
+
+        # Lazily initialise the embedding model if the store was empty
+        if self.model is None:
+            print("📚 Loading sentence-transformer model: all-MiniLM-L6-v2")
+            self.model = SentenceTransformer('all-MiniLM-L6-v2')
+
+        # Encode new documents
+        new_embeddings = self.model.encode(
+            documents,
+            convert_to_numpy=True,
+            show_progress_bar=True
+        )
+
+        # Bootstrap a fresh FAISS index if the store was previously empty
+        if self.index is None:
+            dimension = new_embeddings.shape[1]
+            self.index = faiss.IndexFlatL2(dimension)
+            self.embeddings = new_embeddings
+        else:
+            self.embeddings = np.vstack([self.embeddings, new_embeddings])
+
+        self.index.add(new_embeddings.astype('float32'))
+        self.documents.extend(documents)
+
+        print(f"✓ Vector store now contains {len(self.documents)} document(s)")
+        self.save_local(folder_path)
+
     def save_local(self, folder_path: str):
         """
         Save the vector store to disk

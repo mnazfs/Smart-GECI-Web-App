@@ -201,11 +201,69 @@ Keep it concise but informative (2-4 paragraphs)."""
     return summary
 
 
-def load_database_documents() -> List[str]:
+def get_available_tables() -> List[Dict[str, Any]]:
+    """
+    Fetch all available user tables from the public schema of the PostgreSQL database.
+
+    Returns:
+        List of dicts with table metadata: name, schema, row estimate, and column names.
+
+    Raises:
+        ValueError: If required environment variables are missing
+        psycopg2.Error: If database operations fail
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = _get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Get all tables in the public schema with estimated row counts
+        cursor.execute("""
+            SELECT
+                t.table_name,
+                t.table_schema,
+                COALESCE(s.n_live_tup, 0) AS row_estimate
+            FROM information_schema.tables t
+            LEFT JOIN pg_stat_user_tables s
+                ON s.schemaname = t.table_schema
+                AND s.relname = t.table_name
+            WHERE t.table_schema = 'public'
+                AND t.table_type = 'BASE TABLE'
+            ORDER BY t.table_name
+        """)
+        tables = [dict(row) for row in cursor.fetchall()]
+
+        # For each table, fetch its column names
+        for tbl in tables:
+            cursor.execute("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = 'public'
+                    AND table_name = %s
+                ORDER BY ordinal_position
+            """, (tbl["table_name"],))
+            tbl["columns"] = [dict(col) for col in cursor.fetchall()]
+
+        return tables
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
+def load_database_documents(selected_tables: Optional[List[str]] = None) -> List[str]:
     """
     Load documents from the PostGIS database.
-    Currently fetches data from the 'buildings' table and converts rows to text documents.
-    
+    Fetches data from all selected tables (or all available tables if none specified)
+    and converts rows to text documents.
+
+    Args:
+        selected_tables: Optional list of table names to include.
+            If None or empty, all public tables are fetched.
+
     Returns:
         List of text documents, one per database row
         
@@ -215,31 +273,42 @@ def load_database_documents() -> List[str]:
     documents = []
     conn = None
     cursor = None
-    
+
     try:
-        # Get database connection
         conn = _get_db_connection()
         cursor = conn.cursor(cursor_factory=RealDictCursor)
-        
-        # Define tables to fetch (currently buildings and cse_1f)
-        tables_config = [
-            {
-                "table": "buildings",
-                "query": """
-                    SELECT *, ST_AsEWKB(geom) as geom
-                    FROM buildings
-                    LIMIT 1000
-                """
-            },
-            {
-                "table": "cse_1f",
-                "query": """
-                    SELECT *, ST_AsEWKB(geom) as geom
-                    FROM cse_1f
-                    LIMIT 1000
-                """
-            }
-        ]
+
+        # Determine which tables to process
+        if selected_tables and len(selected_tables) > 0:
+            table_names = selected_tables
+        else:
+            # Fall back to all public tables
+            cursor.execute("""
+                SELECT table_name FROM information_schema.tables
+                WHERE table_schema = 'public' AND table_type = 'BASE TABLE'
+                ORDER BY table_name
+            """)
+            table_names = [row["table_name"] for row in cursor.fetchall()]
+
+        # Check whether a table has a geometry column
+        def _has_geometry_column(tname: str) -> bool:
+            cursor.execute("""
+                SELECT column_name FROM information_schema.columns
+                WHERE table_schema = 'public'
+                    AND table_name = %s
+                    AND udt_name = 'geometry'
+                LIMIT 1
+            """, (tname,))
+            return cursor.fetchone() is not None
+
+        # Build per-table configs dynamically
+        tables_config = []
+        for tname in table_names:
+            if _has_geometry_column(tname):
+                query = f"SELECT *, ST_AsEWKB(geom) as geom FROM {tname} LIMIT 1000"
+            else:
+                query = f"SELECT * FROM {tname} LIMIT 1000"
+            tables_config.append({"table": tname, "query": query})
         
         # Process each table
         for config in tables_config:
