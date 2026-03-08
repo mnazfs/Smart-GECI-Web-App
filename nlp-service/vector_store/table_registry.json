@@ -59,6 +59,16 @@
       "added_at": "2026-03-07T05:45:12.278695+00:00",
       "row_docs": 0,
       "summary_doc": true
+    },
+    "boundary": {
+      "added_at": "2026-03-08T06:30:15.283726+00:00",
+      "row_docs": 1,
+      "summary_doc": true
+    },
+    "layer_registry": {
+      "added_at": "2026-03-08T06:31:17.242216+00:00",
+      "row_docs": 18,
+      "summary_doc": true
     }
   }
 }

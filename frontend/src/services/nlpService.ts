@@ -91,6 +91,19 @@ export async function fetchDbTables(): Promise<DbTablesResponse> {
   return response.json();
 }
 
+/**
+ * GET /api/kb/tables — list every user-accessible table across ALL non-system
+ * schemas (not just 'public').  Use this in the Knowledge Base tab so that
+ * application tables (users, feedback, layer_registry, …) appear alongside
+ * the PostGIS spatial tables.
+ */
+export async function fetchAllDbTables(): Promise<DbTablesResponse> {
+  const response = await fetch(`${NLP_SERVICE_URL}/api/kb/tables`);
+  if (!response.ok)
+    throw new Error(`Fetch all tables failed: ${response.status}`);
+  return response.json();
+}
+
 /** POST /build-rag — start building the knowledge base */
 export async function buildRag(
   selectedTables?: string[]

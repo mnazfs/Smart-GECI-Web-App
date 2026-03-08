@@ -3,7 +3,7 @@ import {
   buildRag,
   fetchRagStatus,
   fetchNlpHealth,
-  fetchDbTables,
+  fetchAllDbTables,
   addTableToKB,
   type RagStatusResponse,
   type DbTable,
@@ -54,7 +54,7 @@ const NlpAdminPanel = () => {
     setTablesLoading(true);
     setTablesError(null);
     try {
-      const result = await fetchDbTables();
+      const result = await fetchAllDbTables();
       setDbTables(result.tables);
       // Pre-select all tables by default
       setSelectedTables(new Set(result.tables.map((t) => t.table_name)));

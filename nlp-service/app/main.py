@@ -5,7 +5,7 @@ from typing import List, Optional
 from app.routes import generate
 from app import config
 from app.rag.knowledge_loader import load_documents
-from app.rag.db_loader import load_database_documents, get_available_tables
+from app.rag.db_loader import load_database_documents, get_available_tables, get_all_available_tables
 from app.rag.vector_store import VectorStore
 from app.rag.vector_store_instance import set_vector_store, get_vector_store
 from app.rag.table_registry import load_registry, reset_registry, register_table
@@ -310,6 +310,30 @@ async def get_db_tables():
     """
     try:
         tables = get_available_tables()
+        registry = load_registry()
+        indexed = registry.get("tables", {})
+        for t in tables:
+            t["in_kb"] = t["table_name"] in indexed
+        return {"success": True, "tables": tables}
+    except ValueError as e:
+        raise HTTPException(status_code=503, detail=str(e))
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/kb/tables")
+async def get_kb_tables():
+    """Return every user-accessible table across all non-system schemas.
+
+    Unlike /db-tables (which is limited to the 'public' schema), this endpoint
+    spans all schemas so that application tables such as users, feedback, and
+    layer_registry are visible alongside the PostGIS spatial tables.
+
+    Each entry includes an `in_kb` boolean indicating whether the table has
+    already been indexed in the vector store.
+    """
+    try:
+        tables = get_all_available_tables()
         registry = load_registry()
         indexed = registry.get("tables", {})
         for t in tables:

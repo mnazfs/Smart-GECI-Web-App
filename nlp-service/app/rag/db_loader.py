@@ -254,6 +254,75 @@ def get_available_tables() -> List[Dict[str, Any]]:
             conn.close()
 
 
+# System schemas that should never be surfaced to users
+_SYSTEM_SCHEMAS = frozenset({
+    "information_schema",
+    "pg_catalog",
+    "pg_toast",
+    "pg_temp_1",
+    "pg_toast_temp_1",
+})
+
+
+def get_all_available_tables() -> List[Dict[str, Any]]:
+    """
+    Fetch every user-accessible table from the database, spanning all non-system
+    schemas (not just 'public').  This is used by the Knowledge Base tab so that
+    application tables in other schemas (e.g. users, feedback, layer_registry)
+    appear alongside the PostGIS spatial tables.
+
+    Returns:
+        List of dicts with keys:
+            table_name, table_schema, row_estimate, columns (list of {column_name, data_type})
+
+    Raises:
+        ValueError: If required environment variables are missing.
+        psycopg2.Error: If database operations fail.
+    """
+    conn = None
+    cursor = None
+    try:
+        conn = _get_db_connection()
+        cursor = conn.cursor(cursor_factory=RealDictCursor)
+
+        # Build the exclusion list as a parameterised tuple so psycopg2 handles quoting.
+        excluded = tuple(_SYSTEM_SCHEMAS)
+
+        cursor.execute("""
+            SELECT
+                t.table_name,
+                t.table_schema,
+                COALESCE(s.n_live_tup, 0) AS row_estimate
+            FROM information_schema.tables t
+            LEFT JOIN pg_stat_user_tables s
+                ON  s.schemaname = t.table_schema
+                AND s.relname    = t.table_name
+            WHERE t.table_schema NOT IN %s
+              AND t.table_type = 'BASE TABLE'
+            ORDER BY t.table_schema, t.table_name
+        """, (excluded,))
+        tables = [dict(row) for row in cursor.fetchall()]
+
+        # Fetch column metadata for every table
+        for tbl in tables:
+            cursor.execute("""
+                SELECT column_name, data_type
+                FROM information_schema.columns
+                WHERE table_schema = %s
+                  AND table_name   = %s
+                ORDER BY ordinal_position
+            """, (tbl["table_schema"], tbl["table_name"]))
+            tbl["columns"] = [dict(col) for col in cursor.fetchall()]
+
+        return tables
+
+    finally:
+        if cursor:
+            cursor.close()
+        if conn:
+            conn.close()
+
+
 def load_database_documents(selected_tables: Optional[List[str]] = None) -> List[str]:
     """
     Load documents from the PostGIS database.
