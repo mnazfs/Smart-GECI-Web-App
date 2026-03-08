@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { Layers, ChevronLeft, ChevronRight } from "lucide-react";
 import { useLayerStore } from "@/store/layerStore";
 import { useAuthStore } from "@/store/authStore";
@@ -7,8 +7,9 @@ import LayerTree from "./LayerTree";
 const LayerPanel = () => {
   const [collapsed, setCollapsed] = useState(false);
   const role = useAuthStore((s) => s.role);
+  const layerTree = useLayerStore((s) => s.layerTree);
   const getVisibleLayers = useLayerStore((s) => s.getVisibleLayers);
-  const visibleLayers = getVisibleLayers(role);
+  const visibleLayers = useMemo(() => getVisibleLayers(role), [layerTree, role, getVisibleLayers]);
 
   return (
     <div
