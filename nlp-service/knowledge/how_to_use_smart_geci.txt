@@ -1,0 +1,46 @@
+How to Use Smart GECI
+
+Smart GECI provides an interactive web interface that allows users to explore infrastructure information and environmental data through maps and natural language queries.
+
+Opening the Application
+
+Users access Smart GECI through a web browser. The application loads an interactive map interface displaying the geographic area covered by the system.
+
+The map supports standard navigation features such as zooming, panning, and layer selection.
+
+Viewing Infrastructure Data
+
+Infrastructure elements such as buildings, utilities, and facilities are organized into layers. Users can enable or disable layers from the layer control panel.
+
+Each layer represents a specific type of infrastructure data. When a layer is activated, the system loads spatial information from the geospatial server and displays it on the map.
+
+Retrieving Metadata
+
+Users can click on infrastructure features displayed on the map to view detailed metadata.
+
+This metadata may include:
+
+Building name
+Number of floors
+Usage type
+Department or facility information
+
+Using the Natural Language Query System
+
+Registered users can access the natural language query interface. This feature allows users to ask questions in everyday language.
+
+Example queries include:
+
+Where is the CSE block?
+How many floors does the library building have?
+Show all administrative buildings.
+
+The system processes the question and returns an answer along with map highlights if relevant spatial data is involved.
+
+Exporting Data
+
+Users may export maps or datasets for offline use, documentation, research, or presentations.
+
+Administrative Features
+
+Administrators have access to additional tools that allow them to update infrastructure datasets, manage users, and configure map layers.

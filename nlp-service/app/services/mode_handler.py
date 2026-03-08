@@ -214,14 +214,26 @@ def handle_mode(mode: str, payload: dict) -> dict:
     
     elif mode == "rag":
         query = payload.get("query", "")
-        
+
         if not query:
             raise Exception("Query is required for RAG")
-        
-        # Call generate_rag_answer to get knowledge-based answer
-        rag_result = generate_rag_answer(query)
+
+        # NEW: Check for optional spatial map context
+        # Import is local to avoid circular-import risk at module level
+        from app.services.map_context_handler import process_map_context
+        spatial_data = process_map_context(query, payload)
+        spatial_context: str | None = spatial_data.get("spatial_text") if spatial_data else None
+        map_actions: list = spatial_data.get("map_actions", []) if spatial_data else []
+
+        # Call generate_rag_answer — spatial_context is injected when present
+        rag_result = generate_rag_answer(query, spatial_context=spatial_context)
         print(f"📚 RAG answer generated\n")
-        
+
+        # Extend response with map_actions when spatial data is available
+        # Clients that don't understand map_actions safely ignore the extra field
+        if map_actions:
+            rag_result["map_actions"] = map_actions
+
         return rag_result
     
     else:

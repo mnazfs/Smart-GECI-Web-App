@@ -1,0 +1,22 @@
+Smart GECI Overview
+
+Smart GECI is a web-based geospatial information system designed to manage, visualize, and analyze infrastructure data using interactive maps and intelligent querying.
+
+The system integrates geographic information systems (GIS), spatial databases, and artificial intelligence to provide an intelligent infrastructure management platform.
+
+Smart GECI allows users to explore infrastructure information through an interactive map interface and through natural language questions. Instead of requiring users to understand complex GIS software or database queries, the platform provides a simple interface where users can visually explore data or ask questions in plain language.
+
+The platform combines spatial data management, web mapping technologies, and machine learning techniques to create a unified digital environment for infrastructure visualization and analysis.
+
+Key capabilities of Smart GECI include:
+
+Interactive map visualization of infrastructure data
+Layer-based geospatial visualization
+Natural language querying of infrastructure information
+Environmental analytics such as Urban Heat Island analysis
+Administrative tools for updating and managing infrastructure data
+Exporting maps and datasets for reporting and analysis
+
+Smart GECI is designed to support students, faculty members, administrators, planners, and researchers who need access to geospatial infrastructure data.
+
+The system provides a modern alternative to traditional infrastructure documentation by transforming spatial datasets into an intelligent, interactive, and easily accessible digital platform.

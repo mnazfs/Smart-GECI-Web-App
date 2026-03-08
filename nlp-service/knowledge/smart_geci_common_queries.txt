@@ -1,0 +1,27 @@
+Example Queries for Smart GECI
+
+The natural language query system allows users to ask questions about infrastructure and spatial information.
+
+Common example queries include:
+
+Where is the CSE block?
+Where is the library building?
+How many floors does the administrative building have?
+Show all academic buildings.
+Show the campus infrastructure map.
+What facilities are available in the mechanical block?
+
+Users may also ask descriptive questions about the system itself.
+
+Examples include:
+
+What is Smart GECI?
+How does the system work?
+What features does the system provide?
+
+Environmental queries may include:
+
+What is the Urban Heat Island effect?
+Show temperature distribution in the study area.
+
+These example queries demonstrate how the system allows users to interact with infrastructure data through simple natural language questions.

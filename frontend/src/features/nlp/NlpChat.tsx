@@ -1,13 +1,16 @@
 import { useRef, useState } from "react";
-import { askQuestion } from "@/services/nlpService";
-import { Send, Loader2, AlertTriangle } from "lucide-react";
+import { askQuestionWithMapContext } from "@/services/nlpService";
+import { useMapContextStore } from "@/map-nlp/MapContextProvider";
+import { useNlpPopupStore } from "@/store/nlpPopupStore";
+import { useNlpMapStore } from "@/store/nlpMapStore";
+import { Send, Loader2, AlertTriangle, MapPin, Pentagon, X } from "lucide-react";
 
 const RAG_NOT_READY_MSG =
   "Knowledge base not initialized. Please build RAG from admin panel.";
 
 interface Message {
   id: number;
-  role: "user" | "assistant" | "warning" | "error";
+  role: "user" | "assistant" | "warning" | "error" | "spatial_info";
   text: string;
 }
 
@@ -24,6 +27,43 @@ const NlpChat = ({ ragReady, serviceOnline }: NlpChatProps) => {
   const [loading, setLoading] = useState(false);
   const nextId = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+
+  // Map-context store
+  const mapContext = useMapContextStore((s) => s.mapContext);
+  const interactionMode = useMapContextStore((s) => s.interactionMode);
+  const clearMapContext = useMapContextStore((s) => s.clearMapContext);
+  const setInteractionMode = useMapContextStore((s) => s.setInteractionMode);
+
+  // Popup store — used to minimise the panel so the user can interact with map
+  const closePopup = useNlpPopupStore((s) => s.close);
+
+  // NLP map actions
+  const setPendingActions = useNlpMapStore((s) => s.setPendingActions);
+
+  // Label for the captured context chip
+  const contextLabel = (() => {
+    if (!mapContext) return null;
+    if (mapContext.type === "polygon") return "Polygon area";
+    if (mapContext.type === "point") {
+      const [lng, lat] = mapContext.geometry.coordinates as [number, number];
+      return `${lat.toFixed(4)}°N, ${lng.toFixed(4)}°E`;
+    }
+    return mapContext.type;
+  })();
+
+  const handleStartPickPoint = () => {
+    setInteractionMode("pick_point");
+    closePopup(); // minimise so the map is fully accessible
+  };
+
+  const handleStartDrawPolygon = () => {
+    setInteractionMode("draw_polygon");
+    closePopup();
+  };
+
+  const handleCancelInteraction = () => {
+    setInteractionMode("idle");
+  };
 
   const addMessage = (msg: Omit<Message, "id">) => {
     const id = ++nextId.current;
@@ -48,12 +88,22 @@ const NlpChat = ({ ragReady, serviceOnline }: NlpChatProps) => {
     setLoading(true);
 
     try {
-      const answer = await askQuestion(trimmed);
+      // Use the spatially captured context (if any) from the store
+      const result = await askQuestionWithMapContext(trimmed, mapContext ?? undefined);
 
-      if (answer === RAG_NOT_READY_MSG) {
-        addMessage({ role: "warning", text: answer });
+      if (result.answer === RAG_NOT_READY_MSG) {
+        addMessage({ role: "warning", text: result.answer });
       } else {
-        addMessage({ role: "assistant", text: answer });
+        addMessage({ role: "assistant", text: result.answer });
+      }
+
+      // Handle spatial map actions
+      if (result.map_actions && result.map_actions.length > 0) {
+        setPendingActions(result.map_actions);
+        addMessage({
+          role: "spatial_info",
+          text: `📍 ${result.map_actions.filter((a) => a.type === "highlight" || a.type === "draw_geometry").length > 0 ? "Spatial results found" : "Spatial context used"}. Navigate to the map to see them highlighted.`,
+        });
       }
     } catch (err) {
       addMessage({
@@ -111,6 +161,18 @@ const NlpChat = ({ ragReady, serviceOnline }: NlpChatProps) => {
             );
           }
 
+          if (msg.role === "spatial_info") {
+            return (
+              <div
+                key={msg.id}
+                className="flex items-start gap-2 px-3 py-2 rounded-lg bg-blue-500/10 text-blue-700 dark:text-blue-400 text-xs"
+              >
+                <MapPin className="h-3.5 w-3.5 shrink-0 mt-0.5" />
+                {msg.text}
+              </div>
+            );
+          }
+
           // error
           return (
             <div
@@ -131,6 +193,85 @@ const NlpChat = ({ ragReady, serviceOnline }: NlpChatProps) => {
 
         <div ref={bottomRef} />
       </div>
+
+      {/* Map context toolbar — only shown when service is online */}
+      {serviceOnline && (
+        <div className="shrink-0 border-t border-border px-3 py-2 bg-muted/20">
+
+          {/* Active-mode banner */}
+          {interactionMode !== "idle" && (
+            <div className="flex items-center justify-between mb-2 px-2.5 py-1.5 rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 text-xs">
+              <span className="flex items-center gap-1.5">
+                {interactionMode === "pick_point" ? (
+                  <>
+                    <MapPin className="h-3 w-3 shrink-0" />
+                    Click a point on the map…
+                  </>
+                ) : (
+                  <>
+                    <Pentagon className="h-3 w-3 shrink-0" />
+                    Click to add vertices, double&#8209;click to finish…
+                  </>
+                )}
+              </span>
+              <button
+                onClick={handleCancelInteraction}
+                className="ml-2 hover:text-blue-800 dark:hover:text-blue-200 transition-colors"
+                aria-label="Cancel"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Captured context chip */}
+          {mapContext && interactionMode === "idle" && (
+            <div className="flex items-center gap-1.5 mb-2">
+              <span className={`flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ring-1 ${
+                mapContext.type === "polygon"
+                  ? "bg-violet-500/15 text-violet-700 dark:text-violet-300 ring-violet-500/30"
+                  : "bg-blue-500/15 text-blue-700 dark:text-blue-300 ring-blue-500/30"
+              }`}>
+                {mapContext.type === "polygon" ? (
+                  <Pentagon className="h-3 w-3 shrink-0" />
+                ) : (
+                  <MapPin className="h-3 w-3 shrink-0" />
+                )}
+                {contextLabel}
+              </span>
+              <button
+                onClick={clearMapContext}
+                title="Clear context"
+                className="text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <X className="h-3 w-3" />
+              </button>
+            </div>
+          )}
+
+          {/* Pick / Draw buttons */}
+          {interactionMode === "idle" && (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleStartPickPoint}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <MapPin className="h-3 w-3" />
+                Pin point
+              </button>
+              <button
+                type="button"
+                onClick={handleStartDrawPolygon}
+                className="flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground transition-colors"
+              >
+                <Pentagon className="h-3 w-3" />
+                Draw area
+              </button>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Disabled overlay message */}
       {(!ragReady || !serviceOnline) && (

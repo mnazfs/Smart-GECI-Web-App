@@ -1,0 +1,34 @@
+Data Sources in Smart GECI
+
+Smart GECI integrates multiple data sources to provide comprehensive geospatial infrastructure information.
+
+Infrastructure Spatial Data
+
+Infrastructure datasets such as buildings, roads, utilities, and facilities are stored in a spatial database.
+
+Each dataset includes both geographic geometry and descriptive metadata.
+
+Geospatial Services
+
+Spatial layers are published using geospatial servers that provide standard web services such as:
+
+Web Map Service (WMS)
+Web Feature Service (WFS)
+
+These services allow the frontend application to request spatial data dynamically.
+
+Satellite and Environmental Data
+
+Environmental analytics modules use satellite-derived datasets such as land surface temperature and vegetation indices.
+
+These datasets enable regional environmental analysis such as Urban Heat Island studies.
+
+Knowledge Base Documents
+
+The system includes a knowledge base containing documentation about infrastructure systems, application usage, and domain concepts.
+
+These documents support the intelligent query system through semantic retrieval.
+
+Combined Data Ecosystem
+
+By combining spatial databases, satellite datasets, and knowledge documents, Smart GECI provides a comprehensive geospatial information platform.

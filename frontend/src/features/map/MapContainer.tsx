@@ -3,6 +3,10 @@ import L from "leaflet";
 import { useLayerStore } from "@/store/layerStore";
 import { useMapStore } from "@/store/mapStore";
 import { useAuthStore } from "@/store/authStore";
+import { useNlpMapStore } from "@/store/nlpMapStore";
+import { useNlpPopupStore } from "@/store/nlpPopupStore";
+import { useMapContextStore } from "@/map-nlp/MapContextProvider";
+import { registerMap, applyMapActions } from "@/map-nlp/mapActionRenderer";
 import { apiClient } from "@/services/api";
 import type { FacilityMetadata } from "@/types/layer";
 
@@ -78,6 +82,23 @@ const MapContainer = () => {
   const layerTree = useLayerStore((s) => s.layerTree);
   const role = useAuthStore((s) => s.role);
 
+  // NLP spatial actions — applied once when the map is ready
+  const pendingActions = useNlpMapStore((s) => s.pendingActions);
+  const clearPendingActions = useNlpMapStore((s) => s.clearPendingActions);
+
+  // Map-context interaction mode
+  const interactionMode = useMapContextStore((s) => s.interactionMode);
+  const setInteractionMode = useMapContextStore((s) => s.setInteractionMode);
+  const setMapContext = useMapContextStore((s) => s.setMapContext);
+  const openNlpPopup = useNlpPopupStore((s) => s.open);
+
+  // Keep a ref so the existing click handler can gate-check synchronously
+  // without re-creating itself whenever the mode changes.
+  const interactionModeRef = useRef(interactionMode);
+  useEffect(() => {
+    interactionModeRef.current = interactionMode;
+  }, [interactionMode]);
+
   const findLayerById = useCallback(
     (id: string): { geoserverName: string; renderMode: "wms" | "wfs" } | null => {
       const search = (
@@ -121,6 +142,10 @@ const MapContainer = () => {
     // never makes a cross-origin request directly to GeoServer.
     // WFS feature clicks call L.DomEvent.stopPropagation so they won't reach here.
     map.on("click", async (e: L.LeafletMouseEvent) => {
+      // Skip WMS feature-info while a spatial interaction mode is active;
+      // the dedicated interaction useEffect owns these clicks.
+      if (interactionModeRef.current !== "idle") return;
+
       const geoserverNames = Object.values(wmsLayersRef.current);
       if (geoserverNames.length === 0) return;
 
@@ -158,8 +183,10 @@ const MapContainer = () => {
     });
 
     mapRef.current = map;
+    registerMap(map);
 
     return () => {
+      registerMap(null);
       map.remove();
       mapRef.current = null;
       wmsLayersRef.current = {};
@@ -229,6 +256,124 @@ const MapContainer = () => {
       }
     });
   }, [activeLayerIds, findLayerById, role, setSelectedMetadata]);
+
+  // ── Apply pending NLP spatial actions when map is ready ───────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map || pendingActions.length === 0) return;
+    applyMapActions(pendingActions);
+    clearPendingActions();
+  }, [pendingActions, clearPendingActions]);
+
+  // ── Spatial interaction modes (pick_point / draw_polygon) ─────────────────
+  useEffect(() => {
+    const map = mapRef.current;
+    if (!map) return;
+
+    if (interactionMode === "idle") return; // nothing to set up
+
+    // Temporary visual layer — cleared on cleanup
+    const tempGroup = L.featureGroup().addTo(map);
+    let polygonVertices: L.LatLng[] = [];
+    let previewLine: L.Polyline | null = null;
+
+    // Style constants
+    const VERTEX_STYLE: L.CircleMarkerOptions = {
+      radius: 6,
+      color: "#3b82f6",
+      fillColor: "#3b82f6",
+      fillOpacity: 0.85,
+      weight: 2,
+    };
+
+    const cleanup = () => {
+      map.off("click", handlePickPoint);
+      map.off("click", handleDrawVertex);
+      map.off("dblclick", handleDrawFinish);
+      map.doubleClickZoom.enable();
+      map.getContainer().style.cursor = "";
+      tempGroup.clearLayers();
+      if (map.hasLayer(tempGroup)) map.removeLayer(tempGroup);
+      polygonVertices = [];
+      previewLine = null;
+    };
+
+    // ── Pick-point mode ─────────────────────────────────────────────────────
+    const handlePickPoint = (e: L.LeafletMouseEvent) => {
+      const { lat, lng } = e.latlng;
+      L.circleMarker([lat, lng], { ...VERTEX_STYLE, radius: 9 }).addTo(tempGroup);
+      setMapContext({
+        type: "point",
+        geometry: { type: "Point", coordinates: [lng, lat] },
+      });
+      // setMapContext resets interactionMode → this effect re-runs with "idle"
+      // cleanup will fire in the return below; also re-open popup
+      openNlpPopup();
+    };
+
+    // ── Draw-polygon mode ───────────────────────────────────────────────────
+    const updatePreview = () => {
+      if (previewLine) tempGroup.removeLayer(previewLine);
+      if (polygonVertices.length >= 2) {
+        previewLine = L.polyline(
+          [...polygonVertices, polygonVertices[0]], // close visually
+          { color: "#3b82f6", weight: 2, dashArray: "6 4", opacity: 0.8 }
+        );
+        tempGroup.addLayer(previewLine);
+      }
+    };
+
+    const handleDrawVertex = (e: L.LeafletMouseEvent) => {
+      polygonVertices.push(e.latlng);
+      L.circleMarker(e.latlng, VERTEX_STYLE).addTo(tempGroup);
+      updatePreview();
+    };
+
+    const handleDrawFinish = (e: L.LeafletMouseEvent) => {
+      L.DomEvent.stop(e); // prevent dblclick zoom
+      // The second click of a double-click already fired a 'click' event and
+      // added a duplicate vertex — remove it.
+      if (polygonVertices.length > 0) polygonVertices.pop();
+      if (polygonVertices.length < 3) return; // need at least 3 vertices
+      const ring = polygonVertices.map(
+        (ll) => [ll.lng, ll.lat] as [number, number]
+      );
+      ring.push(ring[0]); // close ring
+      setMapContext({
+        type: "polygon",
+        geometry: { type: "Polygon", coordinates: [ring] },
+      });
+      openNlpPopup();
+    };
+
+    // ── Escape to cancel ────────────────────────────────────────────────────
+    const handleEscape = (ev: KeyboardEvent) => {
+      if (ev.key !== "Escape") return;
+      cleanup();
+      setInteractionMode("idle");
+      openNlpPopup();
+      document.removeEventListener("keydown", handleEscape);
+    };
+
+    // ── Attach handlers ─────────────────────────────────────────────────────
+    map.getContainer().style.cursor = "crosshair";
+    document.addEventListener("keydown", handleEscape);
+
+    if (interactionMode === "pick_point") {
+      map.once("click", handlePickPoint);
+    } else if (interactionMode === "draw_polygon") {
+      map.doubleClickZoom.disable(); // prevent zoom on finish dblclick
+      map.on("click", handleDrawVertex);
+      map.on("dblclick", handleDrawFinish);
+    }
+
+    return () => {
+      cleanup();
+      document.removeEventListener("keydown", handleEscape);
+    };
+  // openNlpPopup and set* are stable Zustand references — safe to omit from deps
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [interactionMode]);
 
   return (
     <div

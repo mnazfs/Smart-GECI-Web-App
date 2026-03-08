@@ -4,6 +4,7 @@ import { TooltipProvider } from "@/components/ui/tooltip";
 import { Toaster } from "@/components/ui/sonner";
 import Navbar from "@/components/Navbar";
 import AppRouter from "@/app/router";
+import NlpPopup from "@/features/nlp/NlpPopup";
 import { useLayerStore } from "@/store/layerStore";
 import { useAuthStore } from "@/store/authStore";
 
@@ -26,6 +27,8 @@ const App = () => {
           <Navbar />
           <AppRouter />
         </div>
+        {/* Floating NLP popup — available on every page, anchored bottom-right */}
+        <NlpPopup />
       </BrowserRouter>
     </TooltipProvider>
   );

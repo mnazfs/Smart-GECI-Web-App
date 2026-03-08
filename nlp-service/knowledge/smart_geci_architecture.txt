@@ -1,0 +1,45 @@
+Smart GECI System Architecture
+
+Smart GECI is designed using a modular and scalable architecture that integrates geospatial data management, web technologies, and artificial intelligence components.
+
+The architecture separates the system into multiple layers that work together to deliver spatial visualization and intelligent querying capabilities.
+
+Frontend Layer
+
+The frontend is a web-based application built using modern web technologies. It provides the user interface for map interaction, layer selection, and natural language querying.
+
+The frontend communicates with backend services through APIs.
+
+Backend API Layer
+
+The backend server handles user requests, system authentication, and communication between different services.
+
+It acts as the central gateway connecting the frontend interface with geospatial services and AI modules.
+
+Geospatial Data Services
+
+Spatial datasets are managed using geospatial technologies such as GeoServer and spatial databases.
+
+These services publish geospatial layers using standard web services such as Web Map Service (WMS) and Web Feature Service (WFS).
+
+Database Layer
+
+Infrastructure data is stored in a spatial database that supports geographic data types and spatial indexing.
+
+This database stores both spatial features and associated metadata.
+
+AI and NLP Service
+
+The intelligent query system is implemented as a separate microservice that processes natural language questions.
+
+This service uses techniques such as semantic retrieval and natural language processing to interpret user queries and generate responses.
+
+Vector Store and Embedding System
+
+The system uses vector embeddings to represent documents and knowledge sources. These embeddings are stored in a vector index that enables semantic similarity search.
+
+Language Model
+
+A locally hosted language model generates responses using retrieved knowledge from the system’s knowledge base.
+
+This modular architecture ensures scalability, maintainability, and extensibility for future system enhancements.

@@ -1,0 +1,39 @@
+Natural Language Query System in Smart GECI
+
+Smart GECI includes an intelligent natural language query system that allows users to interact with infrastructure data using everyday language.
+
+Traditional GIS systems require users to understand database structures or complex query syntax. Smart GECI removes this barrier by allowing users to ask questions in natural language.
+
+Example Queries
+
+Where is the CSE block?
+How many floors does the library building have?
+Show all buildings on campus.
+
+Query Processing Steps
+
+Intent Detection
+
+The system first determines the intent of the user's query. Queries may request infrastructure information, descriptive knowledge, or spatial visualization.
+
+Retrieval Augmented Generation
+
+The system retrieves relevant knowledge from a document knowledge base using semantic similarity search.
+
+Natural Language to SQL
+
+For structured queries involving infrastructure data, the system may translate natural language into SQL queries that retrieve data from the database.
+
+Context Construction
+
+Relevant documents and database information are combined to create contextual input for the language model.
+
+Response Generation
+
+The language model generates a natural language response based on retrieved information.
+
+Spatial Visualization
+
+If the query involves geographic features, the system converts database results into GeoJSON and displays them on the map interface.
+
+This hybrid approach combines artificial intelligence with geospatial data retrieval to create a powerful and user-friendly querying system.

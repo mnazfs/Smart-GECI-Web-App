@@ -1,0 +1,34 @@
+Map Layers in Smart GECI
+
+Smart GECI organizes spatial data into layers to simplify visualization and interaction.
+
+A layer represents a specific category of spatial information displayed on the map.
+
+Examples of layers include:
+
+Buildings
+Utilities
+Road networks
+Environmental datasets
+Infrastructure facilities
+
+Each layer contains spatial features and associated metadata.
+
+Users can enable or disable layers using the layer control panel. This allows users to customize the map view based on the information they want to see.
+
+Layer Management
+
+Layers are configured through the backend system and published through geospatial services.
+
+The frontend application loads layers dynamically from the geospatial server when users enable them.
+
+Layer Interaction
+
+Users can interact with map layers by clicking on features. When a feature is selected, the system displays detailed information about that infrastructure element.
+
+Benefits of Layer-Based Visualization
+
+Organized presentation of spatial data
+Flexible visualization options
+Efficient data loading
+Simplified infrastructure exploration

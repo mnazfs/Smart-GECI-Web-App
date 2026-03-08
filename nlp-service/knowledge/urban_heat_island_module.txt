@@ -1,0 +1,33 @@
+Urban Heat Island Analysis Module
+
+The Urban Heat Island (UHI) module is an environmental analysis feature integrated into the Smart GECI platform.
+
+Urban Heat Island refers to the phenomenon where urban areas experience higher temperatures than surrounding rural regions.
+
+This effect occurs due to factors such as dense construction materials, reduced vegetation, and human activity.
+
+Purpose of the Module
+
+The UHI module allows users to analyze temperature patterns and environmental conditions using satellite-derived raster datasets.
+
+Key Capabilities
+
+Raster Layer Visualization
+
+Thermal raster datasets representing land surface temperature can be visualized on the interactive map.
+
+Pixel-Level Analysis
+
+Users can click on specific locations on the map to retrieve temperature values associated with that pixel.
+
+Area of Interest Analysis
+
+Users can define a spatial boundary representing an area of interest. The system then calculates statistical temperature values for that area.
+
+Heat Classification Mapping
+
+Temperature values are categorized into different heat intensity levels to identify heat-prone zones.
+
+Decision Support
+
+The analysis results help planners and researchers understand environmental heat patterns and support sustainable planning decisions.

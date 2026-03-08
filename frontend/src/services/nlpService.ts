@@ -3,6 +3,25 @@ const NLP_SERVICE_URL =
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
+/** Spatial context attached to a RAG query (mirrors backend MapContext model). */
+export interface MapContext {
+  type: "point" | "polygon" | "feature" | "viewport";
+  geometry: { type: string; coordinates: unknown };
+  layer?: string;
+  feature_id?: string;
+}
+
+// MapAction is defined in mapActionRenderer — re-exported here for convenience
+export type { MapAction } from "@/map-nlp/mapActionRenderer";
+import type { MapAction } from "@/map-nlp/mapActionRenderer";
+
+/** Extended response shape for spatial-aware RAG queries. */
+export interface NlpSpatialResponse {
+  answer: string;
+  /** Present only when map_context was supplied and spatial features were found. */
+  map_actions?: MapAction[];
+}
+
 export interface HealthResponse {
   success: boolean;
   message: string;
@@ -66,6 +85,46 @@ export async function askQuestion(query: string): Promise<string> {
   }
 
   return data.data.answer as string;
+}
+
+/**
+ * Ask the NLP service a question with an optional spatial map context.
+ *
+ * Backward-compatible: when mapContext is omitted the call is identical to
+ * askQuestion() but also surfaces map_actions if the service returns them.
+ *
+ * @param query      Natural language question.
+ * @param mapContext Optional GeoJSON-based spatial context from the Leaflet map.
+ */
+export async function askQuestionWithMapContext(
+  query: string,
+  mapContext?: MapContext
+): Promise<NlpSpatialResponse> {
+  const payload: Record<string, unknown> = { query };
+  if (mapContext) {
+    payload.map_context = mapContext;
+  }
+
+  const response = await fetch(`${NLP_SERVICE_URL}/api/generate`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ mode: "rag", payload }),
+  });
+
+  if (!response.ok) {
+    throw new Error(`NLP service error: ${response.status}`);
+  }
+
+  const data = await response.json();
+
+  if (!data.success) {
+    throw new Error(data.data?.error || "Query failed");
+  }
+
+  return {
+    answer: data.data.answer as string,
+    map_actions: data.data.map_actions as MapAction[] | undefined,
+  };
 }
 
 /** Poll GET /health */

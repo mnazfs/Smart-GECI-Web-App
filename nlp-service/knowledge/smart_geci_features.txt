@@ -1,0 +1,40 @@
+Key Features of Smart GECI
+
+Smart GECI provides a wide range of features designed to support geospatial infrastructure management, visualization, and analysis.
+
+Interactive Infrastructure Map
+
+The system provides an interactive web-based map where users can explore infrastructure data visually. Users can zoom, pan, and toggle multiple layers to view different categories of spatial information.
+
+Layer-Based Visualization
+
+Infrastructure datasets are organized into thematic layers such as buildings, utilities, and environmental datasets. Users can enable or disable layers to customize the map view.
+
+Metadata Retrieval
+
+Users can click on spatial features on the map to retrieve detailed information about infrastructure elements such as buildings or facilities.
+
+Natural Language Querying
+
+Smart GECI includes an intelligent natural language interface that allows users to ask questions about infrastructure using everyday language.
+
+Instead of navigating through layers manually, users can ask questions such as:
+
+Where is the library building?
+How many floors does the mechanical block have?
+
+Environmental Analytics
+
+The system includes an Urban Heat Island analysis module that enables users to analyze environmental heat distribution using satellite-based thermal data.
+
+Infrastructure Analysis Tools
+
+Administrative users can perform spatial analysis on infrastructure datasets to support planning and monitoring activities.
+
+Data Export
+
+Users can export selected maps and spatial datasets for offline analysis, documentation, or reporting.
+
+Feedback and Issue Reporting
+
+Users can submit feedback or report missing infrastructure elements or incorrect metadata through the system interface.

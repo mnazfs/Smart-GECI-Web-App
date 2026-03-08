@@ -1,0 +1,45 @@
+User Roles in Smart GECI
+
+Smart GECI implements a role-based access control system to ensure secure and appropriate access to system features.
+
+There are three primary user roles in the platform.
+
+General User
+
+General users can access the platform without authentication.
+
+Capabilities include:
+
+Viewing the interactive infrastructure map
+Exploring visible layers
+Viewing infrastructure metadata
+
+General users cannot perform advanced queries or administrative tasks.
+
+Registered User
+
+Registered users must log in to the system.
+
+Additional capabilities include:
+
+Using the natural language query interface
+Performing structured infrastructure searches
+Accessing analytical modules
+Viewing advanced infrastructure information
+
+Registered users have more advanced access but cannot modify system datasets.
+
+Administrator
+
+Administrators have full system access.
+
+Administrative capabilities include:
+
+Managing infrastructure datasets
+Updating spatial data
+Managing map layers
+Configuring system services
+Managing users and access permissions
+Monitoring system activity
+
+Administrative features are restricted to authorized personnel to ensure system security and data integrity.
