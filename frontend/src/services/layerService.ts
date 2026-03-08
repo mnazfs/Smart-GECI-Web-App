@@ -115,3 +115,51 @@ export const layerService = {
     // Tree structure is updated via individual layer endpoints — no-op
   },
 };
+
+// ─── Layer Management (Admin) ─────────────────────────────────────────────────
+
+/**
+ * Admin-only: downloads a layer from PostGIS as a GeoPackage (.gpkg) file.
+ * Triggers a browser download via a hidden <a> element.
+ */
+export async function downloadLayer(layerName: string): Promise<void> {
+  const response = await apiClient.get(
+    `/layers/${encodeURIComponent(layerName)}/download`,
+    { responseType: 'blob' },
+  );
+  const blob = response.data as Blob;
+  const url  = URL.createObjectURL(blob);
+
+  const a = document.createElement('a');
+  a.href  = url;
+  const cleanName = layerName.includes(':') ? layerName.split(':').pop()! : layerName;
+  a.download = `${cleanName}.gpkg`;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/**
+ * Admin-only: uploads a GeoPackage file, imports it into PostGIS, and
+ * publishes the resulting table on GeoServer.
+ */
+export async function uploadLayer(
+  file: File,
+): Promise<{ tableName: string; features: number }> {
+  const formData = new FormData();
+  formData.append('gpkg', file);
+  const response = await apiClient.post<ApiResponse<{ tableName: string; features: number }>>(
+    '/layers/upload',
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return response.data.data;
+}
+
+/**
+ * Admin-only: removes a layer from GeoServer and drops the PostGIS table.
+ */
+export async function deleteLayerFromGeoServer(name: string): Promise<void> {
+  await apiClient.delete(`/layers/${encodeURIComponent(name)}/geoserver`);
+}

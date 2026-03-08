@@ -1,4 +1,7 @@
 import { Router } from 'express';
+import fs from 'fs';
+import path from 'path';
+import multer from 'multer';
 import {
   syncLayers,
   getLayers,
@@ -9,8 +12,31 @@ import {
   updateRenderMode,
   getWfsData,
   getFeatureInfo,
+  downloadLayerAsGPKG,
+  uploadLayerFromGPKG,
+  deleteLayerFromGeoServer,
 } from '../controllers/layerController';
 import { requireAdmin } from '../middleware/roleMiddleware';
+
+// ── Multer — GPKG upload ──────────────────────────────────────────────────────
+
+const uploadsDir = path.join(__dirname, '../../uploads');
+fs.mkdirSync(uploadsDir, { recursive: true });
+
+const upload = multer({
+  storage: multer.diskStorage({
+    destination: (_req, _file, cb) => cb(null, uploadsDir),
+    filename:    (_req, file, cb) => cb(null, `${Date.now()}-${file.originalname}`),
+  }),
+  limits: { fileSize: 100 * 1024 * 1024 }, // 100 MB
+  fileFilter: (_req, file, cb) => {
+    if (!file.originalname.toLowerCase().endsWith('.gpkg')) {
+      cb(new Error('Only .gpkg files are allowed'));
+    } else {
+      cb(null, true);
+    }
+  },
+});
 
 const router = Router();
 
@@ -38,6 +64,25 @@ router.get('/feature-info', getFeatureInfo);
  * Body (optional): { "workspace": "smart_geci" }
  */
 router.post('/sync', syncLayers);
+
+/**
+ * POST /api/layers/upload  [admin only]
+ * Uploads a .gpkg file, imports features into PostGIS, and publishes to GeoServer.
+ * Form field: gpkg (file, max 100 MB)
+ */
+router.post('/upload', requireAdmin, upload.single('gpkg'), uploadLayerFromGPKG);
+
+/**
+ * GET /api/layers/:layerName/download  [admin only]
+ * Exports the layer from PostGIS as a GeoPackage file and streams it to the client.
+ */
+router.get('/:layerName/download', requireAdmin, downloadLayerAsGPKG);
+
+/**
+ * DELETE /api/layers/:name/geoserver  [admin only]
+ * Removes the feature type from GeoServer and drops the PostGIS table.
+ */
+router.delete('/:name/geoserver', requireAdmin, deleteLayerFromGeoServer);
 
 /**
  * PATCH /api/layers/:id/restricted

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Layers, GitBranch, RefreshCw, Database } from "lucide-react";
+import { ArrowLeft, Layers, GitBranch, RefreshCw, Database, PackageOpen } from "lucide-react";
 import { syncLayersFromGeoServer } from "@/services/layerService";
 import { useLayerStore } from "@/store/layerStore";
 
@@ -13,8 +13,11 @@ const LayerHierarchyEditor = lazy(
 const NlpAdminPanel = lazy(
   () => import("@/features/admin/NlpAdminPanel")
 );
+const LayerManagement = lazy(
+  () => import("@/features/admin/LayerManagement")
+);
 
-type AdminTab = "registry" | "hierarchy" | "nlp";
+type AdminTab = "registry" | "hierarchy" | "nlp" | "layers";
 
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>("registry");
@@ -106,6 +109,17 @@ const AdminPage = () => {
             <Database className="h-4 w-4" />
             Knowledge Base
           </button>
+          <button
+            onClick={() => setActiveTab("layers")}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "layers"
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <PackageOpen className="h-4 w-4" />
+            Layers
+          </button>
         </div>
 
         <Suspense
@@ -117,6 +131,8 @@ const AdminPage = () => {
             <LayerRegistryPage />
           ) : activeTab === "hierarchy" ? (
             <LayerHierarchyEditor />
+          ) : activeTab === "layers" ? (
+            <LayerManagement />
           ) : (
             <NlpAdminPanel />
           )}

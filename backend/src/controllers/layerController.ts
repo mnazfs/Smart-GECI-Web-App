@@ -1,10 +1,21 @@
 import type { Request, Response, NextFunction } from 'express';
-import { syncWorkspaceLayers, fetchWfsFeatures, fetchGetFeatureInfo } from '../services/geoserverService';
+import path from 'path';
+import { promises as fs } from 'fs';
+import {
+  syncWorkspaceLayers,
+  fetchWfsFeatures,
+  fetchGetFeatureInfo,
+  publishLayerToGeoServer,
+  deleteGeoServerLayer,
+} from '../services/geoserverService';
 import { getLayerHierarchy, setLayerParent, setLayerRestricted } from '../services/layerService';
 import { LayerRepository }     from '../repositories/layerRepository';
 import { AppError }            from '../middleware/errorHandler';
 import { successResponse }     from '../utils';
 import { env }                 from '../config/env';
+import db                      from '../config/db';
+import { createGeoPackage, getWkbOffset } from '../utils/geopackage';
+import initSqlJs               from 'sql.js';
 
 // ─── syncLayers ───────────────────────────────────────────────────────────────
 
@@ -310,6 +321,265 @@ export async function updateRenderMode(
     }
 
     res.status(200).json(successResponse(updated));
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── downloadLayerAsGPKG ──────────────────────────────────────────────────────
+
+/** Validates that a layer / table name contains only safe identifier characters. */
+function assertSafeIdent(name: string, label: string, next: NextFunction): boolean {
+  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
+    next(new AppError(`Invalid ${label}: "${name}"`, 400));
+    return false;
+  }
+  return true;
+}
+
+/**
+ * GET /api/layers/:layerName/download  [Admin]
+ *
+ * Exports a PostGIS table as a GeoPackage file and streams it to the client.
+ *
+ * Steps:
+ *   1. Strip GeoServer workspace prefix (e.g. "smartgeci:roads" → "roads")
+ *   2. Query geometry_columns for geom column name + SRID
+ *   3. SELECT all rows with geometry as GeoJSON
+ *   4. Build GPKG binary with sql.js
+ *   5. Stream via res.download(); delete file after 5 s
+ */
+export async function downloadLayerAsGPKG(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const rawName   = req.params['layerName'] ?? '';
+    const tableName = rawName.includes(':') ? rawName.split(':').pop()! : rawName;
+
+    if (!assertSafeIdent(tableName, 'layerName', next)) return;
+
+    // ── Geometry metadata ─────────────────────────────────────────────────
+    const geomMeta = await db.query<{ f_geometry_column: string; srid: number }>(
+      `SELECT f_geometry_column, srid
+       FROM geometry_columns
+       WHERE f_table_name = $1
+       LIMIT 1`,
+      [tableName],
+    );
+
+    if (geomMeta.rows.length === 0) {
+      return next(new AppError(`Layer "${tableName}" not found in geometry_columns`, 404));
+    }
+
+    const geomCol = geomMeta.rows[0]!.f_geometry_column;
+    const srid    = geomMeta.rows[0]!.srid;
+
+    // ── Query features ────────────────────────────────────────────────────
+    const dataResult = await db.query<Record<string, unknown>>(
+      `SELECT *,
+              ST_AsGeoJSON("${geomCol}") AS st_asgeojson,
+              GeometryType("${geomCol}")  AS geometrytype,
+              ST_SRID("${geomCol}")       AS st_srid
+       FROM "${tableName}"
+       LIMIT 10000`,
+    );
+
+    const rows     = dataResult.rows;
+    const geomType = (rows[0]?.['geometrytype'] as string | undefined) ?? 'GEOMETRY';
+
+    // ── Build GPKG ────────────────────────────────────────────────────────
+    const exportsDir = path.join(__dirname, '../../exports');
+    await fs.mkdir(exportsDir, { recursive: true });
+    const outPath = path.join(exportsDir, `${tableName}.gpkg`);
+
+    await createGeoPackage(tableName, rows, geomCol, srid, geomType, outPath);
+
+    // ── Stream to client ──────────────────────────────────────────────────
+    res.download(outPath, `${tableName}.gpkg`, (err) => {
+      if (err && !res.headersSent) {
+        next(new AppError('Failed to send file', 500));
+      }
+      // Delete the exported file after 5 seconds
+      setTimeout(() => {
+        fs.unlink(outPath).catch(() => { /* ignore */ });
+      }, 5_000);
+    });
+  } catch (err) {
+    next(err);
+  }
+}
+
+// ─── uploadLayerFromGPKG ──────────────────────────────────────────────────────
+
+/**
+ * POST /api/layers/upload  [Admin]
+ *
+ * Parses an uploaded .gpkg file, creates a PostGIS table with the features,
+ * builds a spatial index, and publishes the layer on GeoServer.
+ *
+ * Multipart field: gpkg (file ≤ 100 MB)
+ */
+export async function uploadLayerFromGPKG(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const file = req.file;
+  if (!file) {
+    return next(new AppError('No file uploaded', 400));
+  }
+
+  try {
+    // ── Open GeoPackage with sql.js ───────────────────────────────────────
+    const SQL       = await initSqlJs();
+    const fileBytes = await fs.readFile(file.path);
+    const gpkg      = new SQL.Database(new Uint8Array(fileBytes));
+
+    // ── Read gpkg_contents ────────────────────────────────────────────────
+    const contentsRes = gpkg.exec(
+      `SELECT table_name FROM gpkg_contents WHERE data_type = 'features' LIMIT 1`,
+    );
+    if (!contentsRes.length || !contentsRes[0]!.values.length) {
+      gpkg.close();
+      await fs.unlink(file.path).catch(() => { /* ignore */ });
+      return next(new AppError('No feature tables found in GeoPackage', 400));
+    }
+    const featureTable = String(contentsRes[0]!.values[0]![0]);
+
+    // ── Read gpkg_geometry_columns ────────────────────────────────────────
+    const geomColRes = gpkg.exec(
+      `SELECT column_name, geometry_type_name, srs_id
+       FROM gpkg_geometry_columns
+       WHERE table_name = ?`,
+      [featureTable],
+    );
+    if (!geomColRes.length || !geomColRes[0]!.values.length) {
+      gpkg.close();
+      await fs.unlink(file.path).catch(() => { /* ignore */ });
+      return next(new AppError('No geometry columns found in GeoPackage', 400));
+    }
+
+    const [geomColumn, geomTypeName, uploadSrid] = geomColRes[0]!.values[0] as [
+      string, string, number,
+    ];
+
+    // ── Get all features ──────────────────────────────────────────────────
+    const featureRes = gpkg.exec(`SELECT * FROM "${featureTable}"`);
+    gpkg.close();
+
+    const colNames   = featureRes.length > 0 ? featureRes[0]!.columns : [];
+    const featureRows = featureRes.length > 0 ? featureRes[0]!.values  : [];
+
+    // ── Derive a safe PostGIS table name from the uploaded filename ───────
+    const baseName = path.basename(file.originalname, '.gpkg');
+    let pgTableName = baseName.replace(/[^a-zA-Z0-9_]/g, '_').toLowerCase();
+    if (!/^[a-z_]/.test(pgTableName)) pgTableName = 'layer_' + pgTableName;
+
+    // ── Attribute column indices (skip geometry column) ───────────────────
+    const attrColPairs = colNames
+      .map((c, i) => ({ col: c, idx: i }))
+      .filter(({ col }) => col !== geomColumn);
+
+    const geomColIdx = colNames.indexOf(geomColumn);
+
+    // ── Create PostGIS table ──────────────────────────────────────────────
+    const attrDefs = attrColPairs.map(({ col }) => `"${col}" TEXT`).join(', ');
+    const createSQL = `
+      CREATE TABLE IF NOT EXISTS "${pgTableName}" (
+        id   SERIAL PRIMARY KEY
+        ${attrDefs ? ', ' + attrDefs : ''},
+        geom GEOMETRY(${geomTypeName}, ${uploadSrid})
+      )`;
+    await db.query(createSQL);
+
+    // ── Insert features ───────────────────────────────────────────────────
+    for (const row of featureRows) {
+      const geomRaw = row[geomColIdx];
+      if (!(geomRaw instanceof Uint8Array)) continue;
+
+      const flagsByte = geomRaw[3];
+      if (flagsByte === undefined) continue;
+
+      const wkbOffset = getWkbOffset(flagsByte);
+      const wkb       = geomRaw.slice(wkbOffset);
+      const wkbHex    = Buffer.from(wkb).toString('hex');
+
+      const attrVals = attrColPairs.map(({ idx }) => {
+        const v = row[idx];
+        return v !== null && v !== undefined ? String(v) : null;
+      });
+
+      if (attrColPairs.length > 0) {
+        const colList    = attrColPairs.map(({ col }) => `"${col}"`).join(', ');
+        const phList     = attrColPairs.map((_, i) => `$${i + 1}`).join(', ');
+        const geomExpr   = `ST_GeomFromWKB('\\x${wkbHex}'::bytea, ${uploadSrid})`;
+        await db.query(
+          `INSERT INTO "${pgTableName}" (${colList}, geom) VALUES (${phList}, ${geomExpr})`,
+          attrVals,
+        );
+      } else {
+        const geomExpr = `ST_GeomFromWKB('\\x${wkbHex}'::bytea, ${uploadSrid})`;
+        await db.query(`INSERT INTO "${pgTableName}" (geom) VALUES (${geomExpr})`);
+      }
+    }
+
+    // ── Spatial index ─────────────────────────────────────────────────────
+    await db.query(
+      `CREATE INDEX IF NOT EXISTS "${pgTableName}_geom_idx"
+       ON "${pgTableName}" USING GIST (geom)`,
+    );
+
+    // ── Cleanup uploaded file ─────────────────────────────────────────────
+    await fs.unlink(file.path).catch(() => { /* ignore */ });
+
+    // ── Publish to GeoServer (non-fatal) ──────────────────────────────────
+    try {
+      await publishLayerToGeoServer(pgTableName);
+    } catch (geoErr) {
+      console.error('[GeoServer] Publish failed:', geoErr instanceof Error ? geoErr.message : geoErr);
+    }
+
+    res.status(201).json(
+      successResponse({ tableName: pgTableName, features: featureRows.length }),
+    );
+  } catch (err) {
+    await fs.unlink(file.path).catch(() => { /* ignore */ });
+    next(err);
+  }
+}
+
+// ─── deleteLayerFromGeoServer ─────────────────────────────────────────────────
+
+/**
+ * DELETE /api/layers/:name/geoserver  [Admin]
+ *
+ * 1. Removes the feature type (and associated layer/styles) from GeoServer.
+ * 2. Drops the PostGIS table with CASCADE.
+ */
+export async function deleteLayerFromGeoServer(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  try {
+    const name = req.params['name'] ?? '';
+    if (!assertSafeIdent(name, 'layer name', next)) return;
+
+    // Remove from GeoServer (404 treated as already-done by the service)
+    await deleteGeoServerLayer(name);
+
+    // Drop the PostGIS table
+    await db.query(`DROP TABLE IF EXISTS "${name}" CASCADE`);
+
+    // Best-effort: remove from layer_registry (may not exist for freshly uploaded layers)
+    await db.query(
+      `DELETE FROM layer_registry WHERE geoserver_name = $1 OR geoserver_name = $2`,
+      [name, `${env.GEOSERVER_WORKSPACE}:${name}`],
+    ).catch(() => { /* ignore — table may not have the row */ });
+
+    res.status(200).json(successResponse({ deleted: name }));
   } catch (err) {
     next(err);
   }

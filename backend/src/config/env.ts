@@ -36,6 +36,8 @@ export const env = {
   GEOSERVER_USER:              optionalEnv('GEOSERVER_USER', 'admin'),
   GEOSERVER_PASSWORD:          optionalEnv('GEOSERVER_PASSWORD', 'geoserver'),
   GEOSERVER_DEFAULT_WORKSPACE: optionalEnv('GEOSERVER_DEFAULT_WORKSPACE', 'smart_geci'),
+  GEOSERVER_WORKSPACE:         optionalEnv('GEOSERVER_WORKSPACE', 'smartgeci'),
+  GEOSERVER_DATASTORE:         optionalEnv('GEOSERVER_DATASTORE', 'campus_db'),
 
   // JWT
   JWT_SECRET:     requireEnv('JWT_SECRET'),

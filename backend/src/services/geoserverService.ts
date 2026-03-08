@@ -207,6 +207,77 @@ export async function fetchGetFeatureInfo(
   return response.data;
 }
 
+// ─── publishLayerToGeoServer ────────────────────────────────────────────────
+
+/**
+ * Publishes a PostGIS table as a GeoServer feature type (WMS/WFS layer).
+ *
+ * If GeoServer returns 409 (already exists) or 500, falls back to a PUT
+ * with bbox recalculation to refresh the existing feature type.
+ */
+export async function publishLayerToGeoServer(layerName: string): Promise<void> {
+  const workspace = env.GEOSERVER_WORKSPACE;
+  const datastore = env.GEOSERVER_DATASTORE;
+
+  const body = {
+    featureType: {
+      name: layerName,
+      nativeName: layerName,
+      srs: 'EPSG:4326',
+      enabled: true,
+      store: {
+        '@class': 'dataStore',
+        name: `${workspace}:${datastore}`,
+      },
+    },
+  };
+
+  try {
+    await geoserverClient.post(
+      `/rest/workspaces/${encodeURIComponent(workspace)}/datastores/${encodeURIComponent(datastore)}/featuretypes`,
+      body,
+      { headers: { 'Content-Type': 'application/json' } },
+    );
+  } catch (err) {
+    if (
+      err instanceof AxiosError &&
+      (err.response?.status === 409 || err.response?.status === 500)
+    ) {
+      // Fallback: update existing feature type and recalculate bounding boxes
+      await geoserverClient.put(
+        `/rest/workspaces/${encodeURIComponent(workspace)}/datastores/${encodeURIComponent(datastore)}/featuretypes/${encodeURIComponent(layerName)}?recalculate=nativebbox,latlonbbox`,
+        body,
+        { headers: { 'Content-Type': 'application/json' } },
+      );
+    } else {
+      throw err;
+    }
+  }
+}
+
+// ─── deleteGeoServerLayer ────────────────────────────────────────────────────
+
+/**
+ * Removes a feature type (and its associated layer/styles) from GeoServer.
+ *
+ * Uses ?recurse=true so the published layer and default styles are also
+ * cleaned up in one call.
+ */
+export async function deleteGeoServerLayer(layerName: string): Promise<void> {
+  const workspace = env.GEOSERVER_WORKSPACE;
+  const datastore = env.GEOSERVER_DATASTORE;
+
+  try {
+    await geoserverClient.delete(
+      `/rest/workspaces/${encodeURIComponent(workspace)}/datastores/${encodeURIComponent(datastore)}/featuretypes/${encodeURIComponent(layerName)}?recurse=true`,
+    );
+  } catch (err) {
+    // 404 = already gone — treat as success
+    if (err instanceof AxiosError && err.response?.status === 404) return;
+    throw err;
+  }
+}
+
 // ─── error helpers ────────────────────────────────────────────────────────────
 
 function buildGeoServerErrorMessage(err: unknown, workspace: string): string {
