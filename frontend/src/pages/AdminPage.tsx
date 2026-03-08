@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Layers, GitBranch, RefreshCw, Database, PackageOpen } from "lucide-react";
+import { ArrowLeft, Layers, GitBranch, RefreshCw, Database, PackageOpen, Users } from "lucide-react";
 import { syncLayersFromGeoServer } from "@/services/layerService";
 import { useLayerStore } from "@/store/layerStore";
 
@@ -16,8 +16,11 @@ const LayerManagement = lazy(
 const NlpAdminPanel = lazy(
   () => import("@/features/admin/NlpAdminPanel")
 );
+const UserManagement = lazy(
+  () => import("@/features/admin/UserManagement")
+);
 
-type AdminTab = "registry" | "hierarchy" | "nlp" | "layers";
+type AdminTab = "registry" | "hierarchy" | "nlp" | "layers" | "users";
 
 const AdminPage = () => {
   const [activeTab, setActiveTab] = useState<AdminTab>("registry");
@@ -120,6 +123,17 @@ const AdminPage = () => {
             <Database className="h-4 w-4" />
             Knowledge Base
           </button>
+          <button
+            onClick={() => setActiveTab("users")}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "users"
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <Users className="h-4 w-4" />
+            Users
+          </button>
         </div>
 
         <Suspense
@@ -133,8 +147,10 @@ const AdminPage = () => {
             <LayerHierarchyEditor />
           ) : activeTab === "layers" ? (
             <LayerManagement />
-          ) : (
+          ) : activeTab === "nlp" ? (
             <NlpAdminPanel />
+          ) : (
+            <UserManagement />
           )}
         </Suspense>
       </div>

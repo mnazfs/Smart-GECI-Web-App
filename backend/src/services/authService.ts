@@ -5,6 +5,8 @@ import { AppError }        from '../middleware/errorHandler';
 import { env }             from '../config/env';
 import type { User, JwtPayload } from '../models/user';
 
+export type { User };
+
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const SALT_ROUNDS = 12;
@@ -93,4 +95,80 @@ export async function register(
   });
 
   return { user };
+}
+
+// ─── listUsers ────────────────────────────────────────────────────────────────
+
+/**
+ * Returns all users. Admin-only (enforced at the route level).
+ */
+export async function listUsers(): Promise<{ users: User[] }> {
+  const users = await UserRepository.findAll();
+  return { users };
+}
+
+// ─── updateUser ───────────────────────────────────────────────────────────────
+
+export interface UpdateUserInput {
+  username?: string;
+  password?: string;
+}
+
+export interface UpdateUserResult {
+  user: User;
+}
+
+/**
+ * Updates a user's username and/or password. Admin-only.
+ *
+ * @throws AppError(400) if neither username nor password is supplied
+ * @throws AppError(409) if the new username is already taken by another user
+ * @throws AppError(404) if the user is not found
+ */
+export async function updateUser(
+  id: string,
+  input: UpdateUserInput,
+): Promise<UpdateUserResult> {
+  if (!input.username && !input.password) {
+    throw new AppError('At least one of username or password must be provided', 400);
+  }
+
+  const fields: { username?: string; passwordHash?: string } = {};
+
+  if (input.username) {
+    // Check uniqueness — must not belong to a different user
+    const existing = await UserRepository.findByUsername(input.username);
+    if (existing && existing.id !== id) {
+      throw new AppError(`Username '${input.username}' is already taken`, 409);
+    }
+    fields.username = input.username;
+  }
+
+  if (input.password) {
+    if (input.password.length < 8) {
+      throw new AppError('Password must be at least 8 characters', 400);
+    }
+    fields.passwordHash = await bcrypt.hash(input.password, SALT_ROUNDS);
+  }
+
+  const user = await UserRepository.updateById(id, fields);
+  if (!user) {
+    throw new AppError('User not found', 404);
+  }
+
+  return { user };
+}
+
+// ─── deleteUser ───────────────────────────────────────────────────────────────
+
+/**
+ * Deletes a user by id. Admin-only.
+ *
+ * @throws AppError(404) if the user does not exist
+ */
+export async function deleteUser(id: string): Promise<void> {
+  const deleted = await UserRepository.deleteById(id);
+  if (!deleted) {
+    throw new AppError('User not found', 404);
+  }
 }

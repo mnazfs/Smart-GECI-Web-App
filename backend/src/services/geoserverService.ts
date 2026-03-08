@@ -10,10 +10,10 @@ interface GeoServerLayerRef {
   href: string;
 }
 
-interface GeoServerLayersResponse {
-  layers:
-    | { layer: GeoServerLayerRef[] }
-    | ''          // GeoServer returns empty string when workspace has no layers
+interface GeoServerFeatureTypesResponse {
+  featureTypes:
+    | { featureType: GeoServerLayerRef[] }
+    | ''
     | null
     | undefined;
 }
@@ -53,27 +53,31 @@ export interface SyncResult {
 // ─── helpers ─────────────────────────────────────────────────────────────────
 
 /**
- * Fetches all layer names from a GeoServer workspace via the REST API.
+ * Fetches all feature type names from a specific GeoServer datastore via
+ * the REST API.
  *
- * GET /rest/workspaces/{workspace}/layers
+ * GET /rest/workspaces/{workspace}/datastores/{store}/featuretypes
  *
  * Returns a deduplicated list of "<workspace>:<layerName>" strings
  * (the format GeoServer uses as WMS layer names).
  */
-async function fetchGeoServerLayerNames(workspace: string): Promise<string[]> {
-  const url = `/rest/workspaces/${encodeURIComponent(workspace)}/layers`;
+async function fetchGeoServerLayerNames(workspace: string, store: string): Promise<string[]> {
+  const url =
+    `/rest/workspaces/${encodeURIComponent(workspace)}/datastores/${encodeURIComponent(store)}/featuretypes`;
 
-  const response = await geoserverClient.get<GeoServerLayersResponse>(url);
+  const response = await geoserverClient.get<GeoServerFeatureTypesResponse>(url);
   const body = response.data;
 
-  // GeoServer returns `{ layers: '' }` (falsy) when there are no layers
-  if (!body.layers) return [];
+  // GeoServer returns `{ featureTypes: '' }` (falsy) when there are no layers
+  if (!body.featureTypes) return [];
 
-  const refs = body.layers.layer;
+  const refs = body.featureTypes.featureType;
   if (!refs || refs.length === 0) return [];
 
-  // Each ref.name is already "<workspace>:<layerName>"
-  return [...new Set(refs.map(r => r.name))];
+  // ref.name is the local layer name; prefix with workspace for WMS usage
+  return [...new Set(refs.map(r =>
+    r.name.includes(':') ? r.name : `${workspace}:${r.name}`
+  ))];
 }
 
 /**
@@ -106,10 +110,12 @@ function toDisplayName(geoserverName: string): string {
  * Express error handler can respond with the correct HTTP status.
  */
 export async function syncWorkspaceLayers(workspace: string): Promise<SyncResult> {
+  const store = env.GEOSERVER_DATASTORE;
+
   // ── 1. Fetch layer names from GeoServer ────────────────────────────────
   let geoserverNames: string[];
   try {
-    geoserverNames = await fetchGeoServerLayerNames(workspace);
+    geoserverNames = await fetchGeoServerLayerNames(workspace, store);
   } catch (err) {
     const message = buildGeoServerErrorMessage(err, workspace);
     throw new Error(message);

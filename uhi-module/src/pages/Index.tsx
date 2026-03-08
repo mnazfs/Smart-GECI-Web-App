@@ -81,7 +81,7 @@ const Index = () => {
       formData.append('file', file);
       formData.append('analysis_type', 'uhi');
       
-      const response = await fetch('http://localhost:8000/api/analysis/aoi/shapefile', {
+      const response = await fetch('http://localhost:8002/api/analysis/aoi/shapefile', {
         method: 'POST',
         body: formData
       });

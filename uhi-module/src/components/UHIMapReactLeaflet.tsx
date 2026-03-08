@@ -129,7 +129,7 @@ const MapClickHandler = ({
       // Call backend API
       try {
         const response = await fetch(
-          `http://localhost:8000/api/analysis/location?lat=${lat}&lon=${lng}`
+          `http://localhost:8002/api/analysis/location?lat=${lat}&lon=${lng}`
         );
         
         if (!response.ok) {
@@ -303,7 +303,7 @@ const MapClickHandler = ({
               ` : `
                 <div class="mt-2">
                   <div class="font-semibold mb-1">Check:</div>
-                  <div>✓ Backend API: <code class="text-xs">http://localhost:8000</code></div>
+                  <div>✓ Backend API: <code class="text-xs">http://localhost:8002</code></div>
                   <div>✓ GeoServer: <code class="text-xs">http://localhost:8080/geoserver</code></div>
                   <div class="mt-2 text-xs opacity-75">
                     Run: <code>python backend/main.py</code>
@@ -401,7 +401,7 @@ const UHIMapReactLeaflet = ({ layers, opacity, onStatsUpdate, onLocationAnalysis
       const formData = new FormData();
       formData.append('file', file);
       
-      const response = await fetch('http://localhost:8000/api/analysis/shapefile', {
+      const response = await fetch('http://localhost:8002/api/analysis/shapefile', {
         method: 'POST',
         body: formData,
       });
