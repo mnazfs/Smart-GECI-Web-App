@@ -18,6 +18,14 @@ interface GeoServerLayersResponse {
     | undefined;
 }
 
+interface GeoServerFeatureTypeResponse {
+  featureType: {
+    name:       string;
+    nativeName: string;
+    title:      string;
+  };
+}
+
 // ─── Axios instance ───────────────────────────────────────────────────────────
 
 const geoserverClient = axios.create({
@@ -205,6 +213,42 @@ export async function fetchGetFeatureInfo(
     responseType: 'json',
   });
   return response.data;
+}
+
+// ─── fetchFeatureTypeTitle ──────────────────────────────────────────────────
+
+/**
+ * Fetches the GeoServer feature-type title for a given layer, which matches
+ * the actual PostGIS table name.
+ *
+ * GeoServer distinguishes three identifiers for each published layer:
+ *   name       – the published WMS/WFS service name
+ *   nativeName – the underlying data-store object name
+ *   title      – human-readable label; in Smart GECI this equals the
+ *                PostGIS table name
+ *
+ * GET /rest/workspaces/{ws}/datastores/{ds}/featuretypes/{name}
+ *
+ * @param layerName  Short layer name without workspace prefix.
+ * @returns The title string, or null if the layer is not found.
+ */
+export async function fetchFeatureTypeTitle(
+  layerName: string,
+): Promise<string | null> {
+  const workspace = env.GEOSERVER_WORKSPACE;
+  const datastore = env.GEOSERVER_DATASTORE;
+
+  try {
+    const response = await geoserverClient.get<GeoServerFeatureTypeResponse>(
+      `/rest/workspaces/${encodeURIComponent(workspace)}/datastores/${encodeURIComponent(datastore)}/featuretypes/${encodeURIComponent(layerName)}`,
+    );
+    return response.data.featureType.title ?? null;
+  } catch (err) {
+    if (err instanceof AxiosError && err.response?.status === 404) {
+      return null;
+    }
+    throw err;
+  }
 }
 
 // ─── publishLayerToGeoServer ────────────────────────────────────────────────

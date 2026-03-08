@@ -40,8 +40,13 @@ const LayerManagement = () => {
         type: "success",
       });
       await fetchAdminLayers();
-    } catch {
-      setMessage({ text: "Upload failed. Ensure the file is a valid .gpkg.", type: "error" });
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
+        setMessage({ text: "Access denied (403). Please sign in with admin credentials — demo shortcuts do not grant API access.", type: "error" });
+      } else {
+        setMessage({ text: "Upload failed. Ensure the file is a valid .gpkg.", type: "error" });
+      }
     } finally {
       setUploading(false);
     }
@@ -54,8 +59,13 @@ const LayerManagement = () => {
     setMessage(null);
     try {
       await downloadLayer(geoserverName);
-    } catch {
-      setMessage({ text: "Download failed.", type: "error" });
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
+        setMessage({ text: "Access denied (403). Please sign in with admin credentials — demo shortcuts do not grant API access.", type: "error" });
+      } else {
+        setMessage({ text: "Download failed. Check that the layer exists in PostGIS.", type: "error" });
+      }
     } finally {
       setDownloadingId(null);
     }
@@ -79,8 +89,13 @@ const LayerManagement = () => {
       await deleteLayerFromGeoServer(name);
       setMessage({ text: `Layer "${name}" deleted.`, type: "success" });
       await fetchAdminLayers();
-    } catch {
-      setMessage({ text: `Failed to delete "${name}".`, type: "error" });
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
+        setMessage({ text: "Access denied (403). Please sign in with admin credentials — demo shortcuts do not grant API access.", type: "error" });
+      } else {
+        setMessage({ text: `Failed to delete "${name}".`, type: "error" });
+      }
     } finally {
       setDeletingId(null);
     }

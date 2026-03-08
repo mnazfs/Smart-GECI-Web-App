@@ -10,11 +10,11 @@ const LayerRegistryPage = lazy(
 const LayerHierarchyEditor = lazy(
   () => import("@/features/admin/LayerHierarchyEditor")
 );
-const NlpAdminPanel = lazy(
-  () => import("@/features/admin/NlpAdminPanel")
-);
 const LayerManagement = lazy(
   () => import("@/features/admin/LayerManagement")
+);
+const NlpAdminPanel = lazy(
+  () => import("@/features/admin/NlpAdminPanel")
 );
 
 type AdminTab = "registry" | "hierarchy" | "nlp" | "layers";
@@ -99,6 +99,17 @@ const AdminPage = () => {
             Layer Config
           </button>
           <button
+            onClick={() => setActiveTab("layers")}
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
+              activeTab === "layers"
+                ? "border-accent text-accent"
+                : "border-transparent text-muted-foreground hover:text-foreground"
+            }`}
+          >
+            <PackageOpen className="h-4 w-4" />
+            Layer Update
+          </button>
+          <button
             onClick={() => setActiveTab("nlp")}
             className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
               activeTab === "nlp"
@@ -108,17 +119,6 @@ const AdminPage = () => {
           >
             <Database className="h-4 w-4" />
             Knowledge Base
-          </button>
-          <button
-            onClick={() => setActiveTab("layers")}
-            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors ${
-              activeTab === "layers"
-                ? "border-accent text-accent"
-                : "border-transparent text-muted-foreground hover:text-foreground"
-            }`}
-          >
-            <PackageOpen className="h-4 w-4" />
-            Layers
           </button>
         </div>
 

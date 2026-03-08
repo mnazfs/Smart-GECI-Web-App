@@ -313,9 +313,11 @@ export async function createGeoPackage(
   ]);
 
   // ── Feature table ───────────────────────────────────────────────────────
-  // Skip PostGIS metadata columns and the original geometry column
+  // Skip PostGIS metadata columns, the original geometry column, and the
+  // source primary-key column (GPKG creates its own auto-increment id).
   const SKIP = new Set([
     geomCol.toLowerCase(),
+    'id',
     'st_asgeojson',
     'geometrytype',
     'st_srid',

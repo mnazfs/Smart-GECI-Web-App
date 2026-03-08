@@ -7,6 +7,7 @@ import {
   fetchGetFeatureInfo,
   publishLayerToGeoServer,
   deleteGeoServerLayer,
+  fetchFeatureTypeTitle,
 } from '../services/geoserverService';
 import { getLayerHierarchy, setLayerParent, setLayerRestricted } from '../services/layerService';
 import { LayerRepository }     from '../repositories/layerRepository';
@@ -328,10 +329,16 @@ export async function updateRenderMode(
 
 // ─── downloadLayerAsGPKG ──────────────────────────────────────────────────────
 
-/** Validates that a layer / table name contains only safe identifier characters. */
+/**
+ * Validates that a name is safe to interpolate into a double-quoted SQL identifier.
+ *
+ * PostgreSQL quoted identifiers can contain any character except the double-quote
+ * and the null byte.  We reject those two characters (and empty strings) and
+ * allow everything else — including spaces that appear in real GeoServer layer names.
+ */
 function assertSafeIdent(name: string, label: string, next: NextFunction): boolean {
-  if (!/^[a-zA-Z_][a-zA-Z0-9_]*$/.test(name)) {
-    next(new AppError(`Invalid ${label}: "${name}"`, 400));
+  if (!name || name.includes('"') || name.includes('\0')) {
+    next(new AppError(`Invalid ${label}: contains disallowed characters`, 400));
     return false;
   }
   return true;
@@ -355,10 +362,25 @@ export async function downloadLayerAsGPKG(
   next: NextFunction,
 ): Promise<void> {
   try {
-    const rawName   = req.params['layerName'] ?? '';
-    const tableName = rawName.includes(':') ? rawName.split(':').pop()! : rawName;
+    const rawName    = req.params['layerName'] ?? '';
+    // Strip workspace prefix to get the short GeoServer layer name
+    const layerShortName = rawName.includes(':') ? rawName.split(':').pop()! : rawName;
 
-    if (!assertSafeIdent(tableName, 'layerName', next)) return;
+    if (!assertSafeIdent(layerShortName, 'layerName', next)) return;
+
+    // ── Resolve PostGIS table name via GeoServer title ────────────────────
+    // GeoServer layer name ≠ PostGIS table name; the feature-type title
+    // matches the actual table name in PostGIS.
+    const geoserverTitle = await fetchFeatureTypeTitle(layerShortName);
+    if (!geoserverTitle) {
+      return next(new AppError(
+        `GeoServer feature type "${layerShortName}" not found. Cannot resolve PostGIS table name.`,
+        404,
+      ));
+    }
+
+    const tableName = geoserverTitle;
+    if (!assertSafeIdent(tableName, 'resolved table name', next)) return;
 
     // ── Geometry metadata ─────────────────────────────────────────────────
     const geomMeta = await db.query<{ f_geometry_column: string; srid: number }>(
