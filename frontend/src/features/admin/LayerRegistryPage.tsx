@@ -1,9 +1,15 @@
 import { useEffect } from "react";
 import { useLayerStore } from "@/store/layerStore";
 import { flattenTree } from "@/features/layers/layerUtils";
-import { Lock, Unlock, Database } from "lucide-react";
+import { Lock, Unlock, Database, RefreshCw } from "lucide-react";
 
-const LayerRegistryPage = () => {
+interface LayerRegistryPageProps {
+  onSync: () => void;
+  syncing: boolean;
+  syncMsg: string | null;
+}
+
+const LayerRegistryPage = ({ onSync, syncing, syncMsg }: LayerRegistryPageProps) => {
   const adminLayerTree = useLayerStore((s) => s.adminLayerTree);
   const fetchAdminLayers = useLayerStore((s) => s.fetchAdminLayers);
   const allLayers = flattenTree(adminLayerTree);
@@ -14,11 +20,26 @@ const LayerRegistryPage = () => {
 
   return (
     <div>
-      <div className="flex items-center gap-2 mb-4">
-        <Database className="h-5 w-5 text-accent" />
-        <h3 className="text-lg font-semibold text-foreground">
-          Layer Registry
-        </h3>
+      <div className="flex items-center justify-between gap-3 mb-4">
+        <div className="flex items-center gap-2">
+          <Database className="h-5 w-5 text-accent" />
+          <h3 className="text-lg font-semibold text-foreground">
+            Layer Registry
+          </h3>
+        </div>
+        <div className="flex items-center gap-3">
+          {syncMsg && (
+            <p className="text-xs text-muted-foreground max-w-xs text-right">{syncMsg}</p>
+          )}
+          <button
+            onClick={onSync}
+            disabled={syncing}
+            className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
+            {syncing ? "Syncing…" : "Sync from GeoServer"}
+          </button>
+        </div>
       </div>
       <p className="text-sm text-muted-foreground mb-4">
         All registered GeoServer layers and their configuration.

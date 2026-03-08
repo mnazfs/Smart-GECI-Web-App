@@ -1,6 +1,6 @@
 import { lazy, Suspense, useState } from "react";
 import { Link } from "react-router-dom";
-import { ArrowLeft, Layers, GitBranch, RefreshCw, Database, PackageOpen, Users } from "lucide-react";
+import { ArrowLeft, Layers, GitBranch, Database, PackageOpen, Users } from "lucide-react";
 import { syncLayersFromGeoServer } from "@/services/layerService";
 import { useLayerStore } from "@/store/layerStore";
 
@@ -61,21 +61,7 @@ const AdminPage = () => {
             <h1 className="text-xl font-bold text-foreground">Admin Console</h1>
           </div>
 
-          <div className="flex items-center gap-3">
-            {syncMsg && (
-              <p className="text-xs text-muted-foreground max-w-xs text-right">
-                {syncMsg}
-              </p>
-            )}
-            <button
-              onClick={handleSync}
-              disabled={syncing}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md bg-accent text-accent-foreground hover:opacity-90 transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <RefreshCw className={`h-3.5 w-3.5 ${syncing ? "animate-spin" : ""}`} />
-              {syncing ? "Syncing…" : "Sync from GeoServer"}
-            </button>
-          </div>
+
         </div>
 
         <div className="flex gap-1 mb-6 border-b border-border">
@@ -142,7 +128,7 @@ const AdminPage = () => {
           }
         >
           {activeTab === "registry" ? (
-            <LayerRegistryPage />
+            <LayerRegistryPage onSync={handleSync} syncing={syncing} syncMsg={syncMsg} />
           ) : activeTab === "hierarchy" ? (
             <LayerHierarchyEditor />
           ) : activeTab === "layers" ? (
