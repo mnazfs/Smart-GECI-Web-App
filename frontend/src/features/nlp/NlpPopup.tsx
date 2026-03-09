@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import {
   MessageSquare,
   ChevronUp,
@@ -7,13 +7,16 @@ import {
   AlertTriangle,
   MapPin,
   Pentagon,
+  History,
 } from "lucide-react";
 import { useAuthStore } from "@/store/authStore";
 import { useNlpPopupStore } from "@/store/nlpPopupStore";
 import { useMapContextStore } from "@/map-nlp/MapContextProvider";
+import { useConversationStore } from "@/store/conversationStore";
 import NlpServiceStatus from "@/features/nlp/NlpServiceStatus";
 import RagManager from "@/features/nlp/RagManager";
 import NlpChat from "@/features/nlp/NlpChat";
+import ConversationSidebar from "@/features/nlp/ConversationSidebar";
 import type { HealthResponse } from "@/services/nlpService";
 
 /**
@@ -37,19 +40,33 @@ const NlpPopup = () => {
   const interactionMode = useMapContextStore((s) => s.interactionMode);
   const isWaiting = interactionMode !== "idle";
 
+  // Conversation store
+  const fetchConversations    = useConversationStore((s) => s.fetchConversations);
+  const setActiveConversation = useConversationStore((s) => s.setActiveConversation);
+
   const isAuthenticated = role !== "guest";
   const isAdmin = role === "admin";
 
-  const [serviceOnline, setServiceOnline] = useState(false);
-  const [ragReady, setRagReady] = useState(false);
-  const [settingsOpen, setSettingsOpen] = useState(false);
+  const [serviceOnline,  setServiceOnline]  = useState(false);
+  const [ragReady,       setRagReady]       = useState(false);
+  const [settingsOpen,   setSettingsOpen]   = useState(false);
+  const [historyOpen,    setHistoryOpen]    = useState(false);
 
-  // Derive both serviceOnline and ragReady from the health poll so
-  // NlpServiceStatus is the single source of truth regardless of whether
-  // the settings panel (and its RagManager) is currently mounted.
+  // Load conversation list whenever the panel is opened
+  useEffect(() => {
+    if (isOpen && isAuthenticated) {
+      fetchConversations();
+    }
+  }, [isOpen, isAuthenticated, fetchConversations]);
+
   const handleHealthChange = (health: HealthResponse | null) => {
     setServiceOnline(!!health?.success);
     setRagReady(!!health?.vector_store_ready);
+  };
+
+  const handleNewChat = async () => {
+    // Clear active conversation — NlpChat will create one on first message
+    setActiveConversation(null);
   };
 
   if (!isAuthenticated) return null;
@@ -104,13 +121,13 @@ const NlpPopup = () => {
       {/* ── Expanded panel ─────────────────────────────────────────────────── */}
       {isOpen && (
         <div
-          className="
+          className={`
             fixed bottom-0 right-0 z-50
-            w-[33vw] min-w-[320px] h-[50vh] min-h-[360px]
-            flex flex-col
+            h-[50vh] min-h-[360px] flex flex-col
             bg-background border-l border-t border-border shadow-2xl
-            overflow-hidden
-          "
+            overflow-hidden transition-[width] duration-200
+            ${historyOpen ? "w-[52vw] min-w-[520px]" : "w-[33vw] min-w-[320px]"}
+          `}
         >
           {/* Header */}
           <div className="flex items-center justify-between px-3 py-2 bg-navbar text-navbar-foreground shrink-0">
@@ -126,6 +143,20 @@ const NlpPopup = () => {
             </div>
 
             <div className="flex items-center gap-0.5 shrink-0">
+              {/* Chat history toggle */}
+              <button
+                onClick={() => setHistoryOpen((v) => !v)}
+                className={`p-1.5 rounded transition-colors ${
+                  historyOpen
+                    ? "bg-navbar-foreground/20 text-navbar-foreground"
+                    : "hover:bg-navbar-foreground/10 text-navbar-foreground/70 hover:text-navbar-foreground"
+                }`}
+                aria-label="Toggle chat history"
+                title="Chat History"
+              >
+                <History className="h-3.5 w-3.5" />
+              </button>
+
               {/* Knowledge base settings toggle */}
               <button
                 onClick={() => setSettingsOpen((v) => !v)}
@@ -170,9 +201,17 @@ const NlpPopup = () => {
             </div>
           )}
 
-          {/* ── Chat — fills all remaining height ──────────────────────── */}
-          <div className="flex-1 min-h-0 overflow-hidden">
-            <NlpChat ragReady={ragReady} serviceOnline={serviceOnline} />
+          {/* ── Body: optional sidebar + chat ────────────────────────────── */}
+          <div className="flex flex-1 min-h-0 overflow-hidden">
+            {/* Conversation history sidebar */}
+            {historyOpen && (
+              <ConversationSidebar onNewChat={handleNewChat} />
+            )}
+
+            {/* Chat area */}
+            <div className="flex-1 min-w-0 overflow-hidden">
+              <NlpChat ragReady={ragReady} serviceOnline={serviceOnline} />
+            </div>
           </div>
         </div>
       )}

@@ -1,5 +1,7 @@
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { askQuestionWithMapContext } from "@/services/nlpService";
+import { getMessages, addMessage as persistMessage } from "@/services/conversationService";
+import { useConversationStore } from "@/store/conversationStore";
 import { useMapContextStore } from "@/map-nlp/MapContextProvider";
 import { useNlpPopupStore } from "@/store/nlpPopupStore";
 import { useNlpMapStore } from "@/store/nlpMapStore";
@@ -25,8 +27,16 @@ const NlpChat = ({ ragReady, serviceOnline }: NlpChatProps) => {
   const [messages, setMessages] = useState<Message[]>([]);
   const [query, setQuery] = useState("");
   const [loading, setLoading] = useState(false);
+  const [historyLoading, setHistoryLoading] = useState(false);
   const nextId = useRef(0);
   const bottomRef = useRef<HTMLDivElement>(null);
+  // Tracks a conversation we *just* created locally so the load effect skips it
+  const justCreatedRef = useRef<string | null>(null);
+
+  // Conversation store
+  const conversationId = useConversationStore((s) => s.activeConversationId);
+  const createNew      = useConversationStore((s) => s.createNew);
+  const bumpConversation = useConversationStore((s) => s.bumpConversation);
 
   // Map-context store
   const mapContext = useMapContextStore((s) => s.mapContext);
@@ -65,6 +75,36 @@ const NlpChat = ({ ragReady, serviceOnline }: NlpChatProps) => {
     setInteractionMode("idle");
   };
 
+  // ── Load history whenever the active conversation changes ─────────────────
+  useEffect(() => {
+    if (!conversationId) {
+      setMessages([]);
+      nextId.current = 0;
+      return;
+    }
+    // Skip reload if we just created this conversation in the same session
+    if (justCreatedRef.current === conversationId) {
+      justCreatedRef.current = null;
+      return;
+    }
+    setHistoryLoading(true);
+    getMessages(conversationId)
+      .then((stored) => {
+        const loaded: Message[] = stored.map((m) => ({
+          id:   ++nextId.current,
+          role: m.role as Message["role"],
+          text: m.text,
+        }));
+        setMessages(loaded);
+        setTimeout(
+          () => bottomRef.current?.scrollIntoView({ behavior: "smooth" }),
+          50,
+        );
+      })
+      .catch(() => { /* silently ignore — user can still chat */ })
+      .finally(() => setHistoryLoading(false));
+  }, [conversationId]);
+
   const addMessage = (msg: Omit<Message, "id">) => {
     const id = ++nextId.current;
     setMessages((prev) => [...prev, { ...msg, id }]);
@@ -87,42 +127,86 @@ const NlpChat = ({ ragReady, serviceOnline }: NlpChatProps) => {
     addMessage({ role: "user", text: trimmed });
     setLoading(true);
 
+    // Resolve (or create) the conversation to persist into
+    let convId = conversationId;
+    if (!convId) {
+      try {
+        // Use first 80 chars of the user's first message as the title
+        convId = await createNew(trimmed.slice(0, 80));
+        justCreatedRef.current = convId; // prevent useEffect from reloading
+      } catch {
+        // Conversation creation failed — still answer, just won't persist
+      }
+    }
+
+    // Persist user message
+    if (convId) {
+      addMessage_remote(convId, "user", trimmed, mapContext ?? undefined);
+    }
+
     try {
       // Use the spatially captured context (if any) from the store
       const result = await askQuestionWithMapContext(trimmed, mapContext ?? undefined);
 
+      let assistantRole: Message["role"] = "assistant";
+      let answerText = result.answer;
+
       if (result.answer === RAG_NOT_READY_MSG) {
-        addMessage({ role: "warning", text: result.answer });
-      } else {
-        addMessage({ role: "assistant", text: result.answer });
+        assistantRole = "warning";
+      }
+
+      addMessage({ role: assistantRole, text: answerText });
+
+      // Persist assistant message
+      if (convId) {
+        addMessage_remote(convId, assistantRole, answerText);
+        bumpConversation(convId);
       }
 
       // Handle spatial map actions
       if (result.map_actions && result.map_actions.length > 0) {
         setPendingActions(result.map_actions);
-        addMessage({
-          role: "spatial_info",
-          text: `📍 ${result.map_actions.filter((a) => a.type === "highlight" || a.type === "draw_geometry").length > 0 ? "Spatial results found" : "Spatial context used"}. Navigate to the map to see them highlighted.`,
-        });
+        const spatialText = `📍 ${
+          result.map_actions.filter(
+            (a) => a.type === "highlight" || a.type === "draw_geometry",
+          ).length > 0
+            ? "Spatial results found"
+            : "Spatial context used"
+        }. Navigate to the map to see them highlighted.`;
+        addMessage({ role: "spatial_info", text: spatialText });
+        if (convId) addMessage_remote(convId, "spatial_info", spatialText);
       }
     } catch (err) {
-      addMessage({
-        role: "error",
-        text:
-          err instanceof Error
-            ? err.message
-            : "An unexpected error occurred.",
-      });
+      const errText =
+        err instanceof Error ? err.message : "An unexpected error occurred.";
+      addMessage({ role: "error", text: errText });
+      if (convId) addMessage_remote(convId, "error", errText);
     } finally {
       setLoading(false);
     }
   };
 
+  /** Fire-and-forget remote message persistence (errors are silently ignored). */
+  function addMessage_remote(
+    convId:     string,
+    role:       Message["role"],
+    text:       string,
+    mapCtx?:    unknown,
+  ) {
+    persistMessage(convId, role, text, mapCtx).catch(() => {});
+  }
+
   return (
     <div className="flex flex-col h-full min-h-0">
       {/* Message list */}
       <div className="flex-1 overflow-y-auto p-4 space-y-3 min-h-0">
-        {messages.length === 0 && (
+        {historyLoading && (
+          <div className="flex items-center justify-center py-10 text-muted-foreground">
+            <Loader2 className="h-4 w-4 animate-spin" />
+          </div>
+        )}
+
+        {!historyLoading && messages.length === 0 && (
           <p className="text-sm text-muted-foreground text-center mt-8">
             Ask a question about GECI data…
           </p>
@@ -282,6 +366,15 @@ const NlpChat = ({ ragReady, serviceOnline }: NlpChatProps) => {
             : "Knowledge base is not ready. Please build it from settings."}
         </div>
       )}
+
+      {/* AI disclaimer */}
+      <div className="shrink-0 flex items-start gap-2 px-3 py-2 border-t border-amber-300/30 bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs">
+        <AlertTriangle className="h-3 w-3 shrink-0 mt-0.5" />
+        <span>
+          AI-generated responses may not be accurate. For precise data, toggle
+          the relevant map layers and inspect features directly.
+        </span>
+      </div>
 
       {/* Input */}
       <form
