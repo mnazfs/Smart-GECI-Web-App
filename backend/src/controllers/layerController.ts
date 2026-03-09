@@ -572,6 +572,170 @@ export async function uploadLayerFromGPKG(
   }
 }
 
+// ─── replaceLayerFromGPKG ─────────────────────────────────────────────────────
+
+/**
+ * PUT /api/layers/:name/replace  [Admin]
+ *
+ * Replaces an existing layer's data with a newly uploaded GeoPackage.
+ *
+ * Steps:
+ *   1. Resolve the PostGIS table name via GeoServer (same as download).
+ *   2. Parse the uploaded .gpkg file.
+ *   3. DROP the existing PostGIS table (CASCADE).
+ *   4. Recreate the table with the same name using the new .gpkg schema.
+ *   5. Insert all features from the new file.
+ *   6. Rebuild the spatial index.
+ *   7. Refresh the GeoServer feature type (recalculate bounding boxes).
+ *   8. Clean up the temp upload.
+ */
+export async function replaceLayerFromGPKG(
+  req: Request,
+  res: Response,
+  next: NextFunction,
+): Promise<void> {
+  const file = req.file;
+  if (!file) {
+    return next(new AppError('No file uploaded', 400));
+  }
+
+  try {
+    const rawName = req.params['name'] ?? '';
+    const layerShortName = rawName.includes(':') ? rawName.split(':').pop()! : rawName;
+
+    if (!assertSafeIdent(layerShortName, 'layerName', next)) {
+      await fs.unlink(file.path).catch(() => { /* ignore */ });
+      return;
+    }
+
+    // ── Resolve PostGIS table name via GeoServer title ────────────────────
+    const geoserverTitle = await fetchFeatureTypeTitle(layerShortName);
+    if (!geoserverTitle) {
+      await fs.unlink(file.path).catch(() => { /* ignore */ });
+      return next(new AppError(
+        `GeoServer feature type "${layerShortName}" not found.`,
+        404,
+      ));
+    }
+
+    const tableName = geoserverTitle;
+    if (!assertSafeIdent(tableName, 'resolved table name', next)) {
+      await fs.unlink(file.path).catch(() => { /* ignore */ });
+      return;
+    }
+
+    // ── Open GeoPackage with sql.js ───────────────────────────────────────
+    const SQL       = await initSqlJs();
+    const fileBytes = await fs.readFile(file.path);
+    const gpkg      = new SQL.Database(new Uint8Array(fileBytes));
+
+    // ── Read gpkg_contents ────────────────────────────────────────────────
+    const contentsRes = gpkg.exec(
+      `SELECT table_name FROM gpkg_contents WHERE data_type = 'features' LIMIT 1`,
+    );
+    if (!contentsRes.length || !contentsRes[0]!.values.length) {
+      gpkg.close();
+      await fs.unlink(file.path).catch(() => { /* ignore */ });
+      return next(new AppError('No feature tables found in GeoPackage', 400));
+    }
+    const featureTable = String(contentsRes[0]!.values[0]![0]);
+
+    // ── Read gpkg_geometry_columns ────────────────────────────────────────
+    const geomColRes = gpkg.exec(
+      `SELECT column_name, geometry_type_name, srs_id
+       FROM gpkg_geometry_columns
+       WHERE table_name = ?`,
+      [featureTable],
+    );
+    if (!geomColRes.length || !geomColRes[0]!.values.length) {
+      gpkg.close();
+      await fs.unlink(file.path).catch(() => { /* ignore */ });
+      return next(new AppError('No geometry columns found in GeoPackage', 400));
+    }
+
+    const [geomColumn, geomTypeName, uploadSrid] = geomColRes[0]!.values[0] as [
+      string, string, number,
+    ];
+
+    // ── Get all features ──────────────────────────────────────────────────
+    const featureRes = gpkg.exec(`SELECT * FROM "${featureTable}"`);
+    gpkg.close();
+
+    const colNames    = featureRes.length > 0 ? featureRes[0]!.columns : [];
+    const featureRows = featureRes.length > 0 ? featureRes[0]!.values  : [];
+
+    const attrColPairs = colNames
+      .map((c, i) => ({ col: c, idx: i }))
+      .filter(({ col }) => col !== geomColumn);
+    const geomColIdx = colNames.indexOf(geomColumn);
+
+    // ── Drop existing table and recreate ──────────────────────────────────
+    await db.query(`DROP TABLE IF EXISTS "${tableName}" CASCADE`);
+
+    const attrDefs  = attrColPairs.map(({ col }) => `"${col}" TEXT`).join(', ');
+    const createSQL = `
+      CREATE TABLE "${tableName}" (
+        id   SERIAL PRIMARY KEY
+        ${attrDefs ? ', ' + attrDefs : ''},
+        geom GEOMETRY(${geomTypeName}, ${uploadSrid})
+      )`;
+    await db.query(createSQL);
+
+    // ── Insert features ───────────────────────────────────────────────────
+    for (const row of featureRows) {
+      const geomRaw = row[geomColIdx];
+      if (!(geomRaw instanceof Uint8Array)) continue;
+
+      const flagsByte = geomRaw[3];
+      if (flagsByte === undefined) continue;
+
+      const wkbOffset = getWkbOffset(flagsByte);
+      const wkb       = geomRaw.slice(wkbOffset);
+      const wkbHex    = Buffer.from(wkb).toString('hex');
+
+      const attrVals = attrColPairs.map(({ idx }) => {
+        const v = row[idx];
+        return v !== null && v !== undefined ? String(v) : null;
+      });
+
+      if (attrColPairs.length > 0) {
+        const colList  = attrColPairs.map(({ col }) => `"${col}"`).join(', ');
+        const phList   = attrColPairs.map((_, i) => `$${i + 1}`).join(', ');
+        const geomExpr = `ST_GeomFromWKB('\\x${wkbHex}'::bytea, ${uploadSrid})`;
+        await db.query(
+          `INSERT INTO "${tableName}" (${colList}, geom) VALUES (${phList}, ${geomExpr})`,
+          attrVals,
+        );
+      } else {
+        const geomExpr = `ST_GeomFromWKB('\\x${wkbHex}'::bytea, ${uploadSrid})`;
+        await db.query(`INSERT INTO "${tableName}" (geom) VALUES (${geomExpr})`);
+      }
+    }
+
+    // ── Spatial index ─────────────────────────────────────────────────────
+    await db.query(
+      `CREATE INDEX "${tableName}_geom_idx" ON "${tableName}" USING GIST (geom)`,
+    );
+
+    // ── Cleanup uploaded file ─────────────────────────────────────────────
+    await fs.unlink(file.path).catch(() => { /* ignore */ });
+
+    // ── Refresh GeoServer feature type (recalculate bounding boxes) ───────
+    try {
+      await publishLayerToGeoServer(tableName);
+    } catch (geoErr) {
+      console.error('[GeoServer] Refresh failed:', geoErr instanceof Error ? geoErr.message : geoErr);
+    }
+
+    res.status(200).json(
+      successResponse({ tableName, features: featureRows.length }),
+    );
+  } catch (err) {
+    await fs.unlink(file.path).catch(() => { /* ignore */ });
+    next(err);
+  }
+}
+
 // ─── deleteLayerFromGeoServer ─────────────────────────────────────────────────
 
 /**

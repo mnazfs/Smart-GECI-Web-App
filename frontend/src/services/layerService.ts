@@ -163,3 +163,25 @@ export async function uploadLayer(
 export async function deleteLayerFromGeoServer(name: string): Promise<void> {
   await apiClient.delete(`/layers/${encodeURIComponent(name)}/geoserver`);
 }
+
+/**
+ * Admin-only: replaces an existing layer's data with a new GeoPackage file.
+ * The PostGIS table is dropped and recreated; GeoServer bounding boxes are
+ * recalculated automatically.
+ *
+ * @param layerName  Short GeoServer layer name (no workspace prefix).
+ * @param file       New .gpkg file to import.
+ */
+export async function replaceLayer(
+  layerName: string,
+  file: File,
+): Promise<{ tableName: string; features: number }> {
+  const formData = new FormData();
+  formData.append('gpkg', file);
+  const response = await apiClient.put<ApiResponse<{ tableName: string; features: number }>>(
+    `/layers/${encodeURIComponent(layerName)}/replace`,
+    formData,
+    { headers: { 'Content-Type': 'multipart/form-data' } },
+  );
+  return response.data.data;
+}

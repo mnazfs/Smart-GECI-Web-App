@@ -14,6 +14,7 @@ import {
   getFeatureInfo,
   downloadLayerAsGPKG,
   uploadLayerFromGPKG,
+  replaceLayerFromGPKG,
   deleteLayerFromGeoServer,
 } from '../controllers/layerController';
 import { requireAdmin } from '../middleware/roleMiddleware';
@@ -77,6 +78,14 @@ router.post('/upload', requireAdmin, upload.single('gpkg'), uploadLayerFromGPKG)
  * Exports the layer from PostGIS as a GeoPackage file and streams it to the client.
  */
 router.get('/:layerName/download', requireAdmin, downloadLayerAsGPKG);
+
+/**
+ * PUT /api/layers/:name/replace  [admin only]
+ * Replaces an existing layer's PostGIS data with a new .gpkg upload.
+ * The GeoServer feature type is refreshed automatically.
+ * Form field: gpkg (file, max 100 MB)
+ */
+router.put('/:name/replace', requireAdmin, upload.single('gpkg'), replaceLayerFromGPKG);
 
 /**
  * DELETE /api/layers/:name/geoserver  [admin only]

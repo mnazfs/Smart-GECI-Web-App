@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { useLayerStore } from "@/store/layerStore";
 import { flattenTree } from "@/features/layers/layerUtils";
-import { downloadLayer, uploadLayer, deleteLayerFromGeoServer } from "@/services/layerService";
-import { Upload, Download, Trash2, PackageOpen } from "lucide-react";
+import { downloadLayer, uploadLayer, deleteLayerFromGeoServer, replaceLayer } from "@/services/layerService";
+import { Upload, Download, Trash2, PackageOpen, Pencil } from "lucide-react";
 
 type MessageState = { text: string; type: "success" | "error" } | null;
 
@@ -10,12 +10,15 @@ const LayerManagement = () => {
   const adminLayerTree  = useLayerStore((s) => s.adminLayerTree);
   const fetchAdminLayers = useLayerStore((s) => s.fetchAdminLayers);
 
-  const [uploading, setUploading]       = useState(false);
+  const [uploading, setUploading]         = useState(false);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
-  const [deletingId, setDeletingId]     = useState<string | null>(null);
-  const [message, setMessage]           = useState<MessageState>(null);
+  const [deletingId, setDeletingId]       = useState<string | null>(null);
+  const [replacingId, setReplacingId]     = useState<string | null>(null);
+  const [message, setMessage]             = useState<MessageState>(null);
 
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const fileInputRef        = useRef<HTMLInputElement>(null);
+  const replaceFileInputRef = useRef<HTMLInputElement>(null);
+  const replacingLayerRef   = useRef<string | null>(null);
 
   useEffect(() => {
     fetchAdminLayers();
@@ -49,6 +52,46 @@ const LayerManagement = () => {
       }
     } finally {
       setUploading(false);
+    }
+  };
+
+  // ── Replace (Edit) ───────────────────────────────────────────────────────────
+
+  const handleReplaceClick = (geoserverName: string) => {
+    const name = geoserverName.includes(":")
+      ? geoserverName.split(":").pop()!
+      : geoserverName;
+    replacingLayerRef.current = name;
+    replaceFileInputRef.current?.click();
+  };
+
+  const handleReplaceFileSelected = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    const layerName = replacingLayerRef.current;
+    if (!file || !layerName) return;
+    e.target.value = "";
+    replacingLayerRef.current = null;
+
+    setReplacingId(layerName);
+    setMessage(null);
+    try {
+      const result = await replaceLayer(layerName, file);
+      setMessage({
+        text: `Layer "${result.tableName}" replaced — ${result.features} feature${result.features !== 1 ? "s" : ""} imported.`,
+        type: "success",
+      });
+      await fetchAdminLayers();
+    } catch (err) {
+      const status = (err as { response?: { status?: number } })?.response?.status;
+      if (status === 403) {
+        setMessage({ text: "Access denied (403). Admin credentials required.", type: "error" });
+      } else if (status === 404) {
+        setMessage({ text: "Layer not found in GeoServer. Cannot replace.", type: "error" });
+      } else {
+        setMessage({ text: "Replace failed. Ensure the file is a valid .gpkg.", type: "error" });
+      }
+    } finally {
+      setReplacingId(null);
     }
   };
 
@@ -122,13 +165,22 @@ const LayerManagement = () => {
           {uploading ? "Uploading…" : "Upload GPKG"}
         </button>
 
-        {/* Hidden file input */}
+        {/* Hidden file input for upload */}
         <input
           ref={fileInputRef}
           type="file"
           accept=".gpkg"
           className="hidden"
           onChange={handleFileSelected}
+        />
+
+        {/* Hidden file input for replace */}
+        <input
+          ref={replaceFileInputRef}
+          type="file"
+          accept=".gpkg"
+          className="hidden"
+          onChange={handleReplaceFileSelected}
         />
       </div>
 
@@ -190,6 +242,17 @@ const LayerManagement = () => {
                       >
                         <Download className="h-3 w-3" />
                         {downloadingId === layer.geoserverName ? "…" : "Download"}
+                      </button>
+
+                      {/* Layer Replace (Edit) */}
+                      <button
+                        onClick={() => handleReplaceClick(layer.geoserverName)}
+                        disabled={replacingId === (layer.geoserverName.includes(":") ? layer.geoserverName.split(":").pop() : layer.geoserverName)}
+                        className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400 hover:bg-blue-500/20 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                        title={`Replace ${layer.name} with a new GPKG`}
+                      >
+                        <Pencil className="h-3 w-3" />
+                        {replacingId === (layer.geoserverName.includes(":") ? layer.geoserverName.split(":").pop() : layer.geoserverName) ? "…" : "Edit"}
                       </button>
 
                       {/* Layer Deletion */}
