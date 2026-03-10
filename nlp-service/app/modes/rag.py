@@ -2,14 +2,18 @@
 import json
 # COMMENTED FOR GROQ MIGRATION - DO NOT DELETE (rollback safety)
 # import requests
-from typing import Dict, Optional
+from typing import Dict, List, Optional
 from app import config
 from app.rag.vector_store_instance import get_vector_store
 from app.rag.vector_store import retrieve_summary_docs, retrieve_row_docs
 from app.services.llm_provider import generate_response
 
 
-def generate_rag_answer(query: str, spatial_context: Optional[str] = None) -> dict:
+def generate_rag_answer(
+    query: str,
+    spatial_context: Optional[str] = None,
+    entities: Optional[List[str]] = None,
+) -> dict:
     """
     Generate answer using RAG (Retrieval Augmented Generation)
     
@@ -62,8 +66,14 @@ def generate_rag_answer(query: str, spatial_context: Optional[str] = None) -> di
         if spatial_context:
             spatial_section = f"\nSpatial Results (from map context):\n{spatial_context}\n"
 
+        # Inject detected entity names as grounding context for the LLM
+        entity_section = ""
+        if entities:
+            entity_lines = "\n".join(f"- {e}" for e in entities)
+            entity_section = f"\nDetected Entities:\n{entity_lines}\n"
+
         phase1_prompt = f"""Context:
-{summary_context}{spatial_section}
+{summary_context}{spatial_section}{entity_section}
 Question:
 {query}
 

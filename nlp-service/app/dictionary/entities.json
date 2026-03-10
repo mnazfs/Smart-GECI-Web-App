@@ -1,0 +1,122 @@
+{
+  "Unknown Room": [
+    "unknown room",
+    "unknown building"
+  ],
+
+  "Electrical Lab": [
+    "electrical lab",
+    "electrical laboratory",
+    "eee lab",
+    "electronics lab"
+  ],
+
+  "Parking Shed": [
+    "parking",
+    "parking shed",
+    "vehicle parking",
+    "bike parking",
+    "car parking"
+  ],
+
+  "Watchman Room": [
+    "watchman room",
+    "watchman",
+    "security room",
+    "security office",
+    "guard room"
+  ],
+
+  "Canteen Outdoor Kitchen": [
+    "canteen",
+    "canteen kitchen",
+    "outdoor kitchen",
+    "mess kitchen"
+  ],
+
+  "Nila Ladies Hostel": [
+    "nila hostel",
+    "nila ladies hostel",
+    "nila"
+  ],
+
+  "Shed Near Kabani": [
+    "shed near kabani",
+    "kabani shed",
+    "shed near hostel"
+  ],
+
+  "Admin Block": [
+    "admin",
+    "admin block",
+    "administration",
+    "administrative block",
+    "office block"
+  ],
+
+  "Mechanical Block II": [
+    "mechanical block 2",
+    "mechanical block ii",
+    "me block 2"
+  ],
+
+  "Staff Quarters I": [
+    "staff quarters 1",
+    "staff quarters i",
+    "quarters 1"
+  ],
+
+  "Staff Quarters II": [
+    "staff quarters 2",
+    "staff quarters ii",
+    "quarters 2"
+  ],
+
+  "Kabani Ladies Hostel": [
+    "kabani hostel",
+    "kabani ladies hostel",
+    "kabani"
+  ],
+
+  "Staff Quarters III": [
+    "staff quarters 3",
+    "staff quarters iii",
+    "quarters 3"
+  ],
+
+  "CS/IT Block": [
+    "cs",
+    "cse",
+    "it",
+    "cs block",
+    "cse block",
+    "it block",
+    "cs it block",
+    "cs/it block",
+    "computer science",
+    "information technology",
+    "computer science block",
+    "information technology block",
+    "cs department",
+    "it department"
+  ],
+
+  "EEE/ECE Block": [
+    "eee",
+    "ece",
+    "eee block",
+    "ece block",
+    "eee ece block",
+    "eee/ece block",
+    "electrical engineering block",
+    "electronics engineering block"
+  ],
+
+  "Mechanical Block I": [
+    "mechanical block 1",
+    "mechanical block i",
+    "mechanical block",
+    "me block",
+    "mechanical department"
+  ]
+}

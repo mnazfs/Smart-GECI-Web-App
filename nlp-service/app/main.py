@@ -10,6 +10,7 @@ from app.rag.vector_store import VectorStore
 from app.rag.vector_store_instance import set_vector_store, get_vector_store
 from app.rag.table_registry import load_registry, reset_registry, register_table
 from app.services.rag_incremental_loader import add_table_to_vectorstore
+from app.dictionary.dictionary_loader import load_entity_dictionary
 import asyncio
 import os
 
@@ -23,6 +24,9 @@ app = FastAPI(
     description="Natural Language Processing service using Ollama",
     version="1.0.0"
 )
+
+# Load entity synonym dictionary into memory at startup
+load_entity_dictionary()
 
 # CORS middleware
 app.add_middleware(

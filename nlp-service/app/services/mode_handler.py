@@ -218,6 +218,14 @@ def handle_mode(mode: str, payload: dict) -> dict:
         if not query:
             raise Exception("Query is required for RAG")
 
+        # Entity synonym normalization – runs before any downstream pipeline
+        from app.dictionary.entity_normalizer import normalize_entities
+        norm = normalize_entities(query)
+        query = norm["normalized_query"]
+        entities = norm["entities"]
+        if entities:
+            print(f"🔤 Entity normalization: {norm}")
+
         # NEW: Check for optional spatial map context
         # Import is local to avoid circular-import risk at module level
         from app.services.map_context_handler import process_map_context
@@ -225,8 +233,8 @@ def handle_mode(mode: str, payload: dict) -> dict:
         spatial_context: str | None = spatial_data.get("spatial_text") if spatial_data else None
         map_actions: list = spatial_data.get("map_actions", []) if spatial_data else []
 
-        # Call generate_rag_answer — spatial_context is injected when present
-        rag_result = generate_rag_answer(query, spatial_context=spatial_context)
+        # Call generate_rag_answer — spatial_context and entities are injected when present
+        rag_result = generate_rag_answer(query, spatial_context=spatial_context, entities=entities)
         print(f"📚 RAG answer generated\n")
 
         # Extend response with map_actions when spatial data is available
